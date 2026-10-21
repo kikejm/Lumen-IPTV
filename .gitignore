@@ -1,0 +1,42 @@
+# --- Secretos (NUNCA al repo) ---
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+keystore/
+vpn-configs/*.conf
+CLAUDE.local.md
+
+# --- Gradle / Android ---
+.gradle/
+build/
+/app/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+output-metadata.json
+
+# --- IDEs ---
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# --- Sistema ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Varios ---
+design/stitch/_preview.png
+/release/
+
+# Datos generados por el servidor de demostración
+tools/mock-xtream/img/
+tools/mock-xtream/sample.ts

@@ -1,0 +1,10 @@
+# Saltos de línea LF en el repo (gradlew debe ser LF para que funcione en GitHub Actions)
+* text=auto eol=lf
+*.bat text eol=crlf
+
+# Binarios
+*.png binary
+*.jpg binary
+*.ttf binary
+*.jar binary
+*.jks binary
