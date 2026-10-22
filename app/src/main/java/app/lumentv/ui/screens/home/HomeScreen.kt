@@ -120,7 +120,7 @@ fun HomeScreen(nav: Navigator) {
                 FocusSurface(onClick = { nav.go(Routes.SETTINGS) }, containerColor = c.accent.copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Rounded.SystemUpdate, contentDescription = null, tint = c.accent)
-                        LText("Actualización disponible: Lumen ${update?.versionName}. Pulsa para instalarla.", style = Lumen.type.callout)
+                        LText("Actualización disponible: IPTV ${update?.versionName}. Pulsa para instalarla.", style = Lumen.type.callout)
                     }
                 }
             }
@@ -234,7 +234,7 @@ private fun WelcomeCard(sync: SyncState, onStart: () -> Unit) {
             .padding(24.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            LText("Bienvenido a Lumen", style = Lumen.type.largeTitle)
+            LText("Bienvenido a IPTV", style = Lumen.type.largeTitle)
             val msg = when (sync) {
                 is SyncState.Running -> "Cargando ${sync.step.lowercase()}… ${if (sync.count > 0) "(${sync.count})" else ""}"
                 is SyncState.Failed -> "No se pudo actualizar la lista: ${sync.message}"

@@ -1,5 +1,12 @@
 package app.lumentv.ui.screens.live
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +25,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.History
@@ -42,11 +51,17 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Icon
 import app.lumentv.core.util.TimeFormatter
+import app.lumentv.data.catalog.QualityFilter
 import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.PlaylistEntity
@@ -75,6 +90,16 @@ import app.lumentv.ui.theme.LumenDimens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private const val PANEL_ANIM_MS = 220
+
+/** El destino puede no estar compuesto aún (columna entrando en animación, lista recién llegada): reintenta. */
+private suspend fun FocusRequester.requestFocusWhenReady() {
+    repeat(10) {
+        if (runCatching { requestFocus() }.isSuccess) return
+        delay(30)
+    }
+}
+
 @Composable
 fun LiveScreen(nav: Navigator) {
     val graph = LocalGraph.current
@@ -84,7 +109,10 @@ fun LiveScreen(nav: Navigator) {
     val playlist by vm.playlist.collectAsState()
     val categories by vm.categories.collectAsState()
     val selected by vm.selectedCategory.collectAsState()
-    val channels by vm.channels.collectAsState()
+    val page by vm.channelPage.collectAsState()
+    val channels = page.channels
+    val quality by vm.qualityFilter.collectAsState()
+    val qualities by vm.availableQualities.collectAsState()
     val favorites by vm.favoriteIds.collectAsState()
     val focused by vm.focusedChannel.collectAsState()
     val programs by vm.focusedPrograms.collectAsState()
@@ -108,8 +136,32 @@ fun LiveScreen(nav: Navigator) {
         player.playWhenReady = true
     }
 
+    // Las categorías solo se muestran mientras se navega por ellas: ◀ desde los canales las abre,
+    // ▶ o elegir una las cierra y el foco vuelve a los canales. Oculta, la previsualización crece.
+    var showCategories by rememberSaveable { mutableStateOf(false) }
+    // Tras elegir categoría, el foco espera a que llegue la lista nueva para ir a su primer canal.
+    var focusFirstChannel by remember { mutableStateOf(false) }
+    val categoryFocus = remember { FocusRequester() }
+    val channelFocus = remember { FocusRequester() }
+    val pageReady = page.categoryId == selected
+    val categoriesVisible = showCategories || (pageReady && channels.isEmpty())
+    val channelsWeight by animateFloatAsState(if (categoriesVisible) 1.15f else 1f, tween(PANEL_ANIM_MS), label = "channels")
+    val previewWeight by animateFloatAsState(if (categoriesVisible) 1f else 1.3f, tween(PANEL_ANIM_MS), label = "preview")
+
+    LaunchedEffect(showCategories) { if (showCategories) categoryFocus.requestFocusWhenReady() }
+    LaunchedEffect(page, focusFirstChannel) {
+        if (!focusFirstChannel || !pageReady) return@LaunchedEffect
+        if (channels.isNotEmpty()) channelFocus.requestFocusWhenReady()
+        focusFirstChannel = false
+    }
+
     fun select(cat: CategoryItem) {
-        if (vm.isCategoryLocked(cat.id)) pinFor = cat else vm.selectedCategory.value = cat.id
+        if (vm.isCategoryLocked(cat.id)) {
+            pinFor = cat
+        } else {
+            vm.selectedCategory.value = cat.id
+            focusFirstChannel = true
+        }
     }
 
     Column(
@@ -118,59 +170,112 @@ fun LiveScreen(nav: Navigator) {
     ) {
         TopBar(nav, Routes.LIVE)
         Gap(height = 18.dp)
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            // 1) Categorías
-            CategoryColumn(
-                items = categories,
-                selectedId = selected,
-                onSelect = ::select,
-                onMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) menuFor = it },
-                modifier = Modifier.width(190.dp).fillMaxHeight(),
-            )
-
-            // 2) Canales
-            Box(Modifier.weight(1.15f).fillMaxHeight()) {
-                if (channels.isEmpty()) {
-                    EmptyState(
-                        Icons.Rounded.Tv,
-                        when (selected) { CAT_FAVORITES -> "Sin favoritos"; CAT_RECENT -> "Sin historial"; else -> "Sin canales" },
-                        when (selected) {
-                            CAT_FAVORITES -> "Pulsa ☰ sobre un canal para añadirlo a favoritos."
-                            else -> "Actualiza la lista desde Inicio si acabas de añadirla."
-                        },
-                    )
-                } else {
-                    val listState = rememberLazyListState()
-                    val firstChannel = remember { FocusRequester() }
-                    // Foco inicial en el primer canal (una sola vez por visita a la pantalla).
-                    var initialFocusDone by rememberSaveable { mutableStateOf(false) }
-                    LaunchedEffect(channels.isNotEmpty()) {
-                        if (!initialFocusDone && channels.isNotEmpty()) {
-                            delay(150)
-                            initialFocusDone = runCatching { firstChannel.requestFocus() }.isSuccess
+        Row(Modifier.weight(1f)) {
+            // 1) Categorías (plegables)
+            AnimatedVisibility(
+                visible = categoriesVisible,
+                enter = expandHorizontally(tween(PANEL_ANIM_MS), expandFrom = Alignment.Start) + fadeIn(tween(PANEL_ANIM_MS)),
+                exit = shrinkHorizontally(tween(PANEL_ANIM_MS), shrinkTowards = Alignment.Start) + fadeOut(tween(PANEL_ANIM_MS)),
+            ) {
+                Row(
+                    Modifier.fillMaxHeight().onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight && channels.isNotEmpty()) {
+                            runCatching { channelFocus.requestFocus() }
+                            true
+                        } else {
+                            false
                         }
-                    }
-                    LaunchedEffect(selected) { listState.scrollToItem(0) }
-                    LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(6.dp)) {
-                        itemsIndexed(channels, key = { _, ch -> ch.streamId }) { index, ch ->
-                            ChannelRow(
-                                modifier = if (index == 0) Modifier.focusRequester(firstChannel) else Modifier,
-                                channel = ch,
-                                playlist = playlist,
-                                isFavorite = ch.streamId in favorites,
-                                fmt = fmt,
-                                onFocus = { vm.focusedChannel.value = ch },
-                                onClick = { playlist?.let { graph.playChannels(context, nav, it, channels, index) } },
-                                onMenu = { channelMenu = ch },
-                            )
+                    },
+                ) {
+                    CategoryColumn(
+                        items = categories,
+                        selectedId = selected,
+                        onSelect = ::select,
+                        onMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) menuFor = it },
+                        selectedFocusRequester = categoryFocus,
+                        modifier = Modifier.width(190.dp).fillMaxHeight(),
+                    )
+                }
+            }
+            // Separador siempre visible: plegado, recuerda que ◀ despliega las categorías.
+            PanelHandle(expanded = categoriesVisible)
+
+            // 2) Canales (con filtro de calidad encima si la categoría tiene varias)
+            Column(Modifier.weight(channelsWeight).fillMaxHeight()) {
+                if (qualities.size > 1 || quality != QualityFilter.ALL) {
+                    QualityRow(
+                        options = if (quality in qualities) qualities else qualities + quality,
+                        selected = quality,
+                        onSelect = vm::setQuality,
+                        onFocus = { showCategories = false },
+                    )
+                }
+                Box(
+                    Modifier.weight(1f).fillMaxWidth().onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                            showCategories = true
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                ) {
+                    if (channels.isEmpty()) {
+                        val filtered = quality != QualityFilter.ALL && selected != CAT_FAVORITES && selected != CAT_RECENT
+                        EmptyState(
+                            Icons.Rounded.Tv,
+                            when {
+                                selected == CAT_FAVORITES -> "Sin favoritos"
+                                selected == CAT_RECENT -> "Sin historial"
+                                filtered -> "Ningún canal ${quality.label}"
+                                else -> "Sin canales"
+                            },
+                            when {
+                                selected == CAT_FAVORITES -> "Pulsa ☰ sobre un canal para añadirlo a favoritos."
+                                filtered -> "Esta categoría no tiene canales en esa calidad. Elige «Todas» arriba."
+                                else -> "Actualiza la lista desde Inicio si acabas de añadirla."
+                            },
+                        )
+                    } else {
+                        val listState = rememberLazyListState()
+                        // Foco inicial en el primer canal (una sola vez por visita a la pantalla).
+                        var initialFocusDone by rememberSaveable { mutableStateOf(false) }
+                        LaunchedEffect(channels.isNotEmpty()) {
+                            if (!initialFocusDone && channels.isNotEmpty()) {
+                                delay(150)
+                                initialFocusDone = runCatching { channelFocus.requestFocus() }.isSuccess
+                            }
+                        }
+                        LaunchedEffect(selected, quality) { listState.scrollToItem(0) }
+                        // ▶ desde las categorías vuelve al último canal enfocado; con categoría nueva, al primero.
+                        val focusTarget = focused?.streamId?.takeIf { id -> !focusFirstChannel && channels.any { it.streamId == id } }
+                            ?: channels.first().streamId
+                        LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(6.dp)) {
+                            itemsIndexed(channels, key = { _, ch -> ch.streamId }) { index, ch ->
+                                ChannelRow(
+                                    modifier = if (ch.streamId == focusTarget) Modifier.focusRequester(channelFocus) else Modifier,
+                                    channel = ch,
+                                    playlist = playlist,
+                                    isFavorite = ch.streamId in favorites,
+                                    fmt = fmt,
+                                    onFocus = {
+                                        vm.focusedChannel.value = ch
+                                        showCategories = false
+                                    },
+                                    onClick = { playlist?.let { graph.playChannels(context, nav, it, channels, index) } },
+                                    onMenu = { channelMenu = ch },
+                                )
+                            }
                         }
                     }
                 }
             }
 
+            Gap(width = 18.dp)
+
             // 3) Previsualización + EPG
-            Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(LumenDimens.radiusLarge)).background(Color.Black)) {
+            Column(Modifier.weight(previewWeight).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
                     if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
                     if (preview != null) Chip("● En directo", c.danger, filled = true, modifier = Modifier.padding(10.dp))
                 }
@@ -197,12 +302,22 @@ fun LiveScreen(nav: Navigator) {
             }
         }
         Gap(height = 10.dp)
-        KeyHints("OK" to "Ver", "☰" to "Opciones", "◀ ▶" to "Navegar")
+        if (categoriesVisible) {
+            KeyHints("OK" to "Elegir", "☰" to "Opciones", "▶" to "Canales")
+        } else {
+            KeyHints("OK" to "Ver", "☰" to "Opciones", "◀" to "Categorías")
+        }
     }
 
     pinFor?.let { cat ->
         PinDialog("Categoría bloqueada", cat.name, onDismiss = { pinFor = null }) { pin ->
-            graph.parental.verify(pin).also { ok -> if (ok) { vm.selectedCategory.value = cat.id; pinFor = null } }
+            graph.parental.verify(pin).also { ok ->
+                if (ok) {
+                    vm.selectedCategory.value = cat.id
+                    focusFirstChannel = true
+                    pinFor = null
+                }
+            }
         }
     }
     menuFor?.let { cat ->
@@ -230,6 +345,55 @@ fun LiveScreen(nav: Navigator) {
             },
             onDismiss = { channelMenu = null },
         )
+    }
+}
+
+/** Píldoras de calidad sobre la lista de canales. ▲ desde el primer canal llega aquí. */
+@Composable
+private fun QualityRow(options: List<QualityFilter>, selected: QualityFilter, onSelect: (QualityFilter) -> Unit, onFocus: () -> Unit) {
+    val c = Lumen.colors
+    Row(
+        Modifier.padding(start = 6.dp, end = 6.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LText("CALIDAD", style = Lumen.type.caption, color = c.textTertiary)
+        options.forEach { q ->
+            val on = q == selected
+            FocusSurface(
+                onClick = { onSelect(q) },
+                modifier = Modifier.onFocusChanged { if (it.isFocused) onFocus() },
+                radius = 50.dp,
+                containerColor = if (on) c.accent else c.surface,
+                focusedContainerColor = if (on) c.accent else c.surfaceFocused,
+                contentColor = if (on) c.onAccent else c.textSecondary,
+                focusedContentColor = if (on) c.onAccent else c.textPrimary,
+            ) {
+                LText(q.label, style = Lumen.type.callout, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+            }
+        }
+    }
+}
+
+/** Línea vertical con asa y flecha entre categorías y canales. No es enfocable: solo es una pista visual. */
+@Composable
+private fun PanelHandle(expanded: Boolean) {
+    val c = Lumen.colors
+    Box(Modifier.width(28.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+        Box(Modifier.width(1.dp).fillMaxHeight().background(c.surfaceElevated))
+        Column(
+            Modifier.clip(RoundedCornerShape(50)).background(c.background).padding(vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                if (expanded) Icons.AutoMirrored.Rounded.KeyboardArrowRight else Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                contentDescription = if (expanded) "▶ Canales" else "◀ Categorías",
+                tint = c.textTertiary,
+                modifier = Modifier.size(18.dp),
+            )
+            Box(Modifier.size(width = 4.dp, height = 40.dp).clip(RoundedCornerShape(50)).background(c.textTertiary))
+        }
     }
 }
 

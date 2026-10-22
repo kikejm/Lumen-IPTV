@@ -174,7 +174,7 @@ class ImportServer(private val scope: CoroutineScope, private val json: Json) {
 
         private val PAGE = """
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Lumen TV · Configurar</title>
+<title>IPTV · Configurar</title>
 <style>
 :root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#000;--muted:#3c3c4399;--accent:#007aff;--ok:#34c759;--err:#ff3b30}
 @media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--muted:#ebebf599;--accent:#0a84ff;--ok:#30d158;--err:#ff453a}}
@@ -189,7 +189,7 @@ button{margin-top:16px;width:100%;font-family:inherit;font-weight:600;font-size:
 .seg{display:flex;gap:8px;margin-bottom:8px}.seg button{margin:0;background:#8882;color:inherit}.seg button.on{background:var(--accent);color:#fff}
 .msg{margin-top:12px;font-weight:600}.ok{color:var(--ok)}.err{color:var(--err)}
 </style></head><body>
-<h1>Lumen TV</h1><p class="sub">Configura la tele desde aquí. Los datos van directos a tu Fire TV por tu Wi‑Fi.</p>
+<h1>IPTV</h1><p class="sub">Configura la tele desde aquí. Los datos van directos a tu Fire TV por tu Wi‑Fi.</p>
 <section><h2>Servidores VPN (Proton)</h2>
 <small>En account.protonvpn.com → Descargas → Configuración WireGuard, genera un fichero por servidor (plataforma Android/Router) y súbelos aquí. Puedes seleccionar varios.</small>
 <input type="file" id="files" accept=".conf,text/plain" multiple>

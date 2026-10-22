@@ -2,14 +2,19 @@ package app.lumentv.ui.screens.live
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.lumentv.data.catalog.ChannelQuality
+import app.lumentv.data.catalog.QualityFilter
 import app.lumentv.data.db.CategoryEntity
 import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.PlaylistEntity
 import app.lumentv.data.epg.Program
 import app.lumentv.di.AppGraph
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,14 +22,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 const val CAT_ALL = "__all__"
 const val CAT_FAVORITES = "__fav__"
 const val CAT_RECENT = "__recent__"
 
 data class CategoryItem(val id: String, val name: String, val count: Int? = null, val locked: Boolean = false)
+
+/** `categoryId` es null hasta que llega la primera lista. */
+data class ChannelPage(val categoryId: String?, val channels: List<ChannelEntity>)
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class LiveViewModel(private val graph: AppGraph) : ViewModel() {
@@ -52,7 +62,11 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val channels: StateFlow<List<ChannelEntity>> = combine(playlist.filterNotNull(), selectedCategory) { p, cat -> p to cat }
+    val qualityFilter: StateFlow<QualityFilter> = graph.settings.settings.map { it.liveQuality }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, QualityFilter.ALL)
+
+    private val unfilteredPage: StateFlow<ChannelPage> = combine(playlist.filterNotNull(), selectedCategory) { p, cat -> p to cat }
         .flatMapLatest { (p, cat) ->
             when (cat) {
                 CAT_ALL -> graph.catalog.channels(p.id, null)
@@ -62,8 +76,31 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
                     h.mapNotNull { byId[it.itemId] }
                 }
                 else -> graph.catalog.channels(p.id, cat)
-            }
+            }.map { ChannelPage(cat, it) }
         }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ChannelPage(null, emptyList()))
+
+    /** Calidades presentes en la categoría actual. Favoritos e historial no se filtran: los eligió el usuario. */
+    val availableQualities: StateFlow<List<QualityFilter>> = unfilteredPage
+        .map { page -> if (page.categoryId.isQualityFiltered()) ChannelQuality.available(page.channels.map { it.name }) else emptyList() }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Canales junto a la categoría a la que pertenecen: la UI sabe si la lista ya es la de la categoría elegida. */
+    val channelPage: StateFlow<ChannelPage> = combine(unfilteredPage, qualityFilter) { page, q ->
+        if (q == QualityFilter.ALL || !page.categoryId.isQualityFiltered()) page
+        else page.copy(channels = page.channels.filter { ChannelQuality.matches(it.name, q) })
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ChannelPage(null, emptyList()))
+
+    fun setQuality(q: QualityFilter) {
+        viewModelScope.launch { graph.settings.setLiveQuality(q) }
+    }
+
+    private fun String?.isQualityFiltered() = this != null && this != CAT_FAVORITES && this != CAT_RECENT
+
+    val channels: StateFlow<List<ChannelEntity>> = channelPage.map { it.channels }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** EPG del canal enfocado (con debounce para no saturar al hacer scroll rápido). */

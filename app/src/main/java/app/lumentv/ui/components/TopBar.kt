@@ -42,7 +42,7 @@ fun TopBar(nav: Navigator, currentRoute: String, modifier: Modifier = Modifier, 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        LText("Lumen", style = Lumen.type.title, color = c.textPrimary)
+        LText("IPTV", style = Lumen.type.title, color = c.textPrimary)
         Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
             if (title != null) {
                 LText(title, style = Lumen.type.headline, color = c.textSecondary)

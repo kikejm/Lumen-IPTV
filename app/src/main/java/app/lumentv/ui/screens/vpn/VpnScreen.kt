@@ -322,7 +322,7 @@ private fun StatusPanel(
         }
         LText("ÁMBITO DEL TÚNEL", style = Lumen.type.caption, color = c.textSecondary)
         Row(Modifier.clip(RoundedCornerShape(50)).background(c.surfaceElevated).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            ScopeSegment("Solo Lumen", selected = appOnly) { onScope(true) }
+            ScopeSegment("Solo IPTV", selected = appOnly) { onScope(true) }
             ScopeSegment("Todo el Fire TV", selected = !appOnly) { onScope(false) }
         }
     }

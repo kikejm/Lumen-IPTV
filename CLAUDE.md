@@ -1,6 +1,6 @@
 # CLAUDE.md — Lumen TV
 
-App IPTV personal para **Amazon Fire TV** (Android TV, solo mando D-pad) con **VPN WireGuard integrada** para servidores de Proton VPN. Kotlin + Jetpack Compose for TV + Media3. Un único módulo `:app`.
+App IPTV personal para **Amazon Fire TV** (Android TV, solo mando D-pad) con **VPN WireGuard integrada** para servidores de Proton VPN. Kotlin + Jetpack Compose for TV + Media3. Un único módulo `:app`. El nombre visible de la app es **IPTV** (`app_name`, banner, textos); «Lumen» queda solo como nombre interno del código y del paquete `app.lumentv`, que no se cambia (cambiarlo rompería las actualizaciones).
 
 Antes de tocar nada lee: @ARCHITECTURE.md (mapa del código e invariantes) y, si es UI, @DESIGN.md (tokens y reglas visuales).
 

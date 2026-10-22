@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -20,7 +23,10 @@ import app.lumentv.ui.onMenuKey
 import app.lumentv.ui.screens.live.CategoryItem
 import app.lumentv.ui.theme.Lumen
 
-/** Columna de categorías reutilizada por Directo, Cine y Series. ☰ sobre una categoría = opciones. */
+/**
+ * Columna de categorías reutilizada por Directo, Cine y Series. ☰ sobre una categoría = opciones.
+ * `selectedFocusRequester` se asigna a la categoría activa; la lista arranca desplazada hasta ella.
+ */
 @Composable
 fun CategoryColumn(
     items: List<CategoryItem>,
@@ -28,10 +34,13 @@ fun CategoryColumn(
     onSelect: (CategoryItem) -> Unit,
     modifier: Modifier = Modifier,
     onMenu: ((CategoryItem) -> Unit)? = null,
+    selectedFocusRequester: FocusRequester? = null,
 ) {
     val c = Lumen.colors
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = items.indexOfFirst { it.id == selectedId }.coerceAtLeast(0))
     LazyColumn(
         modifier = modifier,
+        state = listState,
         verticalArrangement = Arrangement.spacedBy(4.dp),
         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 6.dp),
     ) {
@@ -39,7 +48,9 @@ fun CategoryColumn(
             val selected = item.id == selectedId
             FocusSurface(
                 onClick = { onSelect(item) },
-                modifier = Modifier.fillMaxWidth().then(if (onMenu != null) Modifier.onMenuKey { onMenu(item) } else Modifier),
+                modifier = Modifier.fillMaxWidth()
+                    .then(if (onMenu != null) Modifier.onMenuKey { onMenu(item) } else Modifier)
+                    .then(if (selected && selectedFocusRequester != null) Modifier.focusRequester(selectedFocusRequester) else Modifier),
                 containerColor = if (selected) c.accent else Color.Transparent,
                 focusedContainerColor = if (selected) c.accent else c.surfaceFocused,
                 contentColor = if (selected) c.onAccent else c.textPrimary,

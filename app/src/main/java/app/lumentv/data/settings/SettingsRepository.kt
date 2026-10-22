@@ -1,6 +1,7 @@
 package app.lumentv.data.settings
 
 import android.content.Context
+import app.lumentv.data.catalog.QualityFilter
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
@@ -43,6 +44,7 @@ data class AppSettings(
     val externalEpgUrls: List<String> = emptyList(),
     val activePlaylistId: Long = -1,
     val lastUpdateCheck: Long = 0,
+    val liveQuality: QualityFilter = QualityFilter.ALL,
 ) {
     val hasParentalPin: Boolean get() = parentalPinHash.isNotEmpty()
 
@@ -91,6 +93,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setExternalEpgUrls(v: List<String>) = update { it[K.externalEpg] = v.joinToString("\n") }
     suspend fun setActivePlaylist(id: Long) = update { it[K.activePlaylist] = id }
     suspend fun setLastUpdateCheck(v: Long) = update { it[K.lastUpdateCheck] = v }
+    suspend fun setLiveQuality(v: QualityFilter) = update { it[K.liveQuality] = v.name }
 
     private fun Preferences.toSettings() = AppSettings(
         themeMode = enumOr(this[K.theme], ThemeMode.DARK),
@@ -113,6 +116,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         externalEpgUrls = this[K.externalEpg]?.lines()?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList(),
         activePlaylistId = this[K.activePlaylist] ?: -1,
         lastUpdateCheck = this[K.lastUpdateCheck] ?: 0,
+        liveQuality = enumOr(this[K.liveQuality], QualityFilter.ALL),
     )
 
     private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
@@ -139,5 +143,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val externalEpg = stringPreferencesKey("external_epg")
         val activePlaylist = longPreferencesKey("active_playlist")
         val lastUpdateCheck = longPreferencesKey("last_update_check")
+        val liveQuality = stringPreferencesKey("live_quality")
     }
 }

@@ -87,7 +87,7 @@ private enum class Section(val label: String, val icon: ImageVector) {
 }
 
 private val EXTERNAL_PLAYERS = listOf(
-    "" to "Interno (Lumen)",
+    "" to "Interno (IPTV)",
     "org.videolan.vlc" to "VLC",
     "com.mxtech.videoplayer.ad" to "MX Player",
     "org.xbmc.kodi" to "Kodi",
@@ -311,9 +311,9 @@ private fun VpnSection(nav: Navigator) {
     val s = rememberSettings()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingRow("Servidores y conexión", "Abrir", "Elige país y servidor de Proton VPN") { nav.go(Routes.VPN) }
-        SettingRow("Conectar al abrir Lumen", onOff(s.vpnAutoConnect), "Usa el último servidor (o el favorito)") { scope.launch { graph.settings.setVpnAutoConnect(!s.vpnAutoConnect) } }
-        SettingRow("Desconectar al salir de Lumen", onOff(s.vpnDisconnectOnExit), "Recomendado si el ámbito es «Todo el Fire TV»") { scope.launch { graph.settings.setVpnDisconnectOnExit(!s.vpnDisconnectOnExit) } }
-        SettingRow("Ámbito del túnel", if (s.vpnAppOnly) "Solo Lumen" else "Todo el Fire TV", "«Solo Lumen» no afecta a Netflix, Prime, etc.") {
+        SettingRow("Conectar al abrir IPTV", onOff(s.vpnAutoConnect), "Usa el último servidor (o el favorito)") { scope.launch { graph.settings.setVpnAutoConnect(!s.vpnAutoConnect) } }
+        SettingRow("Desconectar al salir de IPTV", onOff(s.vpnDisconnectOnExit), "Recomendado si el ámbito es «Todo el Fire TV»") { scope.launch { graph.settings.setVpnDisconnectOnExit(!s.vpnDisconnectOnExit) } }
+        SettingRow("Ámbito del túnel", if (s.vpnAppOnly) "Solo IPTV" else "Todo el Fire TV", "«Solo IPTV» no afecta a Netflix, Prime, etc.") {
             scope.launch { graph.settings.setVpnAppOnly(!s.vpnAppOnly); graph.vpn.reapplyScope() }
         }
     }
@@ -366,7 +366,7 @@ private fun SpeedSection() {
     val c = Lumen.colors
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         LText(
-            "Mide la descarga real de Lumen. " + if (vpn is app.lumentv.vpn.VpnState.Connected) "La VPN está activa: el resultado incluye el túnel." else "La VPN está desactivada.",
+            "Mide la descarga real de IPTV. " + if (vpn is app.lumentv.vpn.VpnState.Connected) "La VPN está activa: el resultado incluye el túnel." else "La VPN está desactivada.",
             style = Lumen.type.body, color = c.textSecondary,
         )
         LText(if (running) "%.1f Mbps".format(live) else result?.let { "%.1f Mbps".format(it.downloadMbps) } ?: "— Mbps", style = Lumen.type.largeTitle)
@@ -420,13 +420,13 @@ private fun UpdatesSection() {
         available?.let { info ->
             GlassPanel(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LText("Lumen ${info.versionName}", style = Lumen.type.headline)
+                    LText("IPTV ${info.versionName}", style = Lumen.type.headline)
                     if (info.notes.isNotBlank()) LText(info.notes, style = Lumen.type.body, color = c.textSecondary, maxLines = 8)
                     progress?.let { ProgressLine(it) }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         PillButton("Descargar e instalar", primary = true, icon = Icons.Rounded.SystemUpdate, onClick = {
                             if (!graph.updater.canInstall()) {
-                                status = "Permite a Lumen instalar apps y vuelve a pulsar"
+                                status = "Permite a IPTV instalar apps y vuelve a pulsar"
                                 graph.updater.openInstallPermissionSettings()
                                 return@PillButton
                             }
@@ -448,9 +448,9 @@ private fun UpdatesSection() {
 private fun AboutSection() {
     val c = Lumen.colors
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        LText("Lumen TV ${BuildConfig.VERSION_NAME}", style = Lumen.type.headline)
+        LText("IPTV ${BuildConfig.VERSION_NAME}", style = Lumen.type.headline)
         LText("Reproductor IPTV personal para Fire TV con VPN WireGuard integrada.", style = Lumen.type.body, color = c.textSecondary)
-        LText("Lumen no incluye ni proporciona contenido: reproduce las listas que configures tú.", style = Lumen.type.body, color = c.textSecondary)
+        LText("IPTV no incluye ni proporciona contenido: reproduce las listas que configures tú.", style = Lumen.type.body, color = c.textSecondary)
         LText("Componentes de código abierto: AndroidX Media3, Jetpack Compose for TV, WireGuard (Apache 2.0), OkHttp, Coil, ZXing, fuente Inter (OFL).", style = Lumen.type.caption, color = c.textTertiary)
     }
 }

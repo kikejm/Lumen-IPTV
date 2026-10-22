@@ -112,7 +112,7 @@ fun PlaylistEditScreen(nav: Navigator, playlistId: Long?, isOnboarding: Boolean)
         horizontalArrangement = Arrangement.spacedBy(48.dp),
     ) {
         Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            LText("Lumen", style = Lumen.type.largeTitle)
+            LText("IPTV", style = Lumen.type.largeTitle)
             LText(
                 if (isOnboarding) "Añade tu lista IPTV para empezar. Es la misma que usas en IPTV Smarters (servidor, usuario y contraseña)."
                 else "Edita los datos de la lista.",

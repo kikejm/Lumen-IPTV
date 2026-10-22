@@ -145,7 +145,7 @@ Inter (empaquetada en `res/font`, Fire TV no tiene Google Play Services para fue
 - Barra superior común (`TopBar`): marca · pestañas en *segmented control* · píldora VPN · buscar · ajustes · reloj.
 - Patrones de pantalla:
   - **Inicio**: "Sigue viendo" (tarjeta ancha) → "Accesos" (6 mosaicos) → fila de favoritos → pie con estado de la lista.
-  - **TV en directo**: 3 columnas — categorías (220 dp) · canales con programa actual · previsualización 16:9 + EPG (400 dp).
+  - **TV en directo**: canales con programa actual · previsualización 16:9 + EPG, que se lleva el espacio sobrante. Las categorías (190 dp) están plegadas: ◀ desde los canales las despliega a la izquierda; ▶ o elegir una las pliega y devuelve el foco a los canales. Entre ambas columnas hay siempre un separador (línea + asa + flecha ‹/›) que indica que hay un panel plegado. Encima de los canales, píldoras de calidad (Todas · 4K · FHD · HD · SD · HEVC, solo las presentes en la categoría) deducidas del nombre del canal.
   - **Cine / Series**: fondo con el arte del elemento enfocado, *hero* con título/metadatos, raíl de categorías y rejilla de pósters 2:3.
   - **VPN**: panel de estado (330 dp) · países con bandera · servidores del país.
   - **Ajustes**: secciones a la izquierda, filas valor/acción a la derecha.
@@ -157,7 +157,7 @@ No hay sombras duras ni bordes. La profundidad se comunica con: escala en foco, 
 
 ## Shapes
 
-Esquinas continuas: 10 dp (filas, chips grandes), 14 dp (tarjetas), 20 dp (paneles, hero, previsualización), píldora para botones, pestañas y estados. Los pósters usan 14 dp.
+Esquinas continuas: 10 dp (filas, chips grandes), 14 dp (tarjetas, previsualización de TV en directo), 20 dp (paneles, hero), píldora para botones, pestañas y estados. Los pósters usan 14 dp.
 
 ## Components
 

@@ -1,14 +1,14 @@
-# Lumen TV
+# IPTV (proyecto Lumen TV)
 
 Reproductor IPTV propio para **Amazon Fire TV / Fire TV Stick**, con diseño minimalista inspirado en Apple tvOS (modo claro y oscuro) y **VPN de Proton integrada**: eliges país y servidor desde la propia app, sin abrir Proton VPN antes ni después.
 
-> Lumen no incluye contenido. Reproduce las listas IPTV que tú configures (Xtream Codes o M3U).
+> En el Fire TV la app se llama **IPTV**; «Lumen» es solo el nombre interno del código (`app.lumentv`). No incluye contenido. Reproduce las listas IPTV que tú configures (Xtream Codes o M3U).
 
 ## Funciones
 
 | | |
 |---|---|
-| 📺 **TV en directo** | Categorías, favoritos, historial, previsualización con sonido, EPG actual y siguiente, zapping con ▲▼ |
+| 📺 **TV en directo** | Categorías plegables, filtro por calidad (4K/FHD/HD/SD/HEVC), favoritos, historial, previsualización con sonido, EPG actual y siguiente, zapping con ▲▼ |
 | 🎬 **Cine y series** | Rejilla de pósters, ficha con sinopsis y reparto, temporadas/episodios, "Continuar viendo", auto-siguiente episodio |
 | 🗓️ **Guía EPG** | Parrilla por categoría; EPG del proveedor + **fuentes XMLTV externas** (.xml/.gz) + desfase horario |
 | ⏪ **Catch-up** | Programas pasados de los canales con archivo, también desde la guía |

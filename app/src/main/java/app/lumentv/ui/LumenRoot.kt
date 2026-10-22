@@ -52,7 +52,7 @@ fun LumenRoot(graph: AppGraph) {
             val hasPlaylist by produceState<Boolean?>(null) { value = graph.playlists.activeNow() != null }
             Box(Modifier.fillMaxSize().background(Lumen.colors.background)) {
                 when (hasPlaylist) {
-                    null -> LText("Lumen", style = Lumen.type.largeTitle, color = Lumen.colors.textSecondary, modifier = Modifier.align(Alignment.Center))
+                    null -> LText("IPTV", style = Lumen.type.largeTitle, color = Lumen.colors.textSecondary, modifier = Modifier.align(Alignment.Center))
                     else -> LumenNavHost(startOnboarding = hasPlaylist == false)
                 }
             }
