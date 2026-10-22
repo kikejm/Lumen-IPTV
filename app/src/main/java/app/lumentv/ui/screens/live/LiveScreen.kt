@@ -111,6 +111,11 @@ fun LiveScreen(nav: Navigator) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val vm: LiveViewModel = viewModel { LiveViewModel(graph) }
+    // Al volver de pantalla completa llega su reproductor con el canal que sonaba (quizá tras hacer zapping):
+    // se enfoca y previsualiza ese canal ya, antes de leer el estado, para que la previsualización no lo recargue.
+    val returned = remember {
+        graph.players.takeHandOff()?.also { graph.playback.current?.channel?.let(vm::showNow) }
+    }
     val playlist by vm.playlist.collectAsState()
     val categories by vm.categories.collectAsState()
     val selected by vm.selectedCategory.collectAsState()
@@ -130,9 +135,11 @@ fun LiveScreen(nav: Navigator) {
     var menuFor by remember { mutableStateOf<CategoryItem?>(null) }
     var channelMenu by remember { mutableStateOf<ChannelEntity?>(null) }
 
-    // Reproductor de previsualización: vive mientras la pantalla está abierta.
-    val player = remember { graph.players.create(lightweight = true) }
-    var previewState by remember { mutableIntStateOf(Player.STATE_IDLE) }
+    // Reproductor de previsualización: vive mientras la pantalla está abierta, salvo que pase a
+    // pantalla completa con su canal (por eso tiene el búfer normal y no el ligero).
+    val player = remember { returned ?: graph.players.create() }
+    var handedOff by remember { mutableStateOf(false) }
+    var previewState by remember { mutableIntStateOf(player.playbackState) }
     var previewFailed by remember { mutableStateOf(false) }
     var previewRetry by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) {
@@ -146,17 +153,35 @@ fun LiveScreen(nav: Navigator) {
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
-            player.release()
+            if (!handedOff) player.release()
         }
+    }
+
+    // Pantalla completa. Si la previsualización ya muestra ese canal, su reproductor sigue sin recargar.
+    fun watch(list: List<ChannelEntity>, index: Int) {
+        val p = playlist ?: return
+        val ch = list[index]
+        if (settings.externalPlayerPackage.isBlank() && preview?.streamId == ch.streamId &&
+            PlayerFactory.isLoaded(player, graph.streams.live(p, ch).url)
+        ) {
+            handedOff = true
+            graph.players.handOff(player)
+        }
+        graph.playChannels(context, nav, p, list, index)
     }
     LaunchedEffect(preview) { previewRetry = 0 }
     LaunchedEffect(preview, playlist, previewRetry) {
         val p = playlist ?: return@LaunchedEffect
         val ch = preview ?: return@LaunchedEffect
-        if (previewRetry > 0) delay(2_000)
+        val url = graph.streams.live(p, ch).url
         previewFailed = false
+        if (previewRetry == 0 && PlayerFactory.isLoaded(player, url)) {
+            player.playWhenReady = true // ya sonaba (vuelta de pantalla completa)
+            return@LaunchedEffect
+        }
+        if (previewRetry > 0) delay(2_000)
         graph.players.claimStream(player)
-        player.setMediaItem(PlayerFactory.mediaItem(graph.streams.live(p, ch).url))
+        player.setMediaItem(PlayerFactory.mediaItem(url))
         player.prepare()
         player.playWhenReady = true
     }
@@ -170,6 +195,9 @@ fun LiveScreen(nav: Navigator) {
     // Foco inicial en un canal una vez por visita: al volver del reproductor, el que se estaba viendo.
     var initialFocusDone by remember { mutableStateOf(false) }
     val channelFocus = remember { FocusRequester() }
+    // ▶ desde los canales lleva el foco a la previsualización; OK ahí la abre a pantalla completa.
+    val previewFocus = remember { FocusRequester() }
+    var previewFocused by remember { mutableStateOf(false) }
     val pageReady = page.categoryId == selected
     val categoriesVisible = showCategories || (pageReady && channels.isEmpty())
     val channelsWeight by animateFloatAsState(if (categoriesVisible) 1.15f else 1f, tween(PANEL_ANIM_MS), label = "channels")
@@ -239,11 +267,11 @@ fun LiveScreen(nav: Navigator) {
                 }
                 Box(
                     Modifier.weight(1f).fillMaxWidth().onPreviewKeyEvent { e ->
-                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
-                            showCategories = true
-                            true
-                        } else {
-                            false
+                        when {
+                            e.type != KeyEventType.KeyDown -> false
+                            e.key == Key.DirectionLeft -> { showCategories = true; true }
+                            e.key == Key.DirectionRight -> { runCatching { previewFocus.requestFocus() }; true }
+                            else -> false
                         }
                     },
                 ) {
@@ -268,7 +296,11 @@ fun LiveScreen(nav: Navigator) {
                         LaunchedEffect(channels.isNotEmpty()) {
                             if (!initialFocusDone && channels.isNotEmpty()) {
                                 delay(150)
-                                initialFocusDone = runCatching { channelFocus.requestFocus() }.isSuccess
+                                // El canal enfocado puede quedar lejos (zapping en pantalla completa): primero se lleva a la vista.
+                                val index = channels.indexOfFirst { it.streamId == focused?.streamId }
+                                if (index > 0) listState.scrollToItem((index - 2).coerceAtLeast(0))
+                                channelFocus.requestFocusWhenReady()
+                                initialFocusDone = true
                             }
                         }
                         LaunchedEffect(selected, quality) { listState.scrollToItem(0) }
@@ -287,7 +319,7 @@ fun LiveScreen(nav: Navigator) {
                                         vm.focusedChannel.value = ch
                                         showCategories = false
                                     },
-                                    onClick = { playlist?.let { graph.playChannels(context, nav, it, channels, index) } },
+                                    onClick = { watch(channels, index) },
                                     onMenu = { channelMenu = ch },
                                 )
                             }
@@ -300,12 +332,37 @@ fun LiveScreen(nav: Navigator) {
 
             // 3) Previsualización + EPG
             Column(Modifier.weight(previewWeight).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
-                    if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
-                    when {
-                        preview == null -> Unit
-                        previewFailed -> LText("No disponible", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
-                        previewState != Player.STATE_READY -> LoadingSpinner(Modifier.align(Alignment.Center))
+                FocusSurface(
+                    onClick = {
+                        preview?.let { ch ->
+                            val index = channels.indexOfFirst { it.streamId == ch.streamId }
+                            if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                        .focusRequester(previewFocus)
+                        .onFocusChanged { previewFocused = it.isFocused }
+                        .onMenuKey { preview?.let { channelMenu = it } }
+                        .onPreviewKeyEvent { e ->
+                            if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                                runCatching { channelFocus.requestFocus() }
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                    radius = LumenDimens.radiusMedium,
+                    containerColor = Color.Black,
+                    focusedContainerColor = Color.Black,
+                    focusedScale = 1.02f,
+                ) {
+                    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(LumenDimens.radiusMedium))) {
+                        if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
+                        when {
+                            preview == null -> Unit
+                            previewFailed -> LText("No disponible", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
+                            previewState != Player.STATE_READY -> LoadingSpinner(Modifier.align(Alignment.Center))
+                        }
                     }
                 }
                 focused?.let { ch ->
@@ -331,10 +388,10 @@ fun LiveScreen(nav: Navigator) {
             }
         }
         Gap(height = 10.dp)
-        if (categoriesVisible) {
-            KeyHints("OK" to "Elegir", "☰" to "Opciones", "▶" to "Canales")
-        } else {
-            KeyHints("OK" to "Ver", "☰" to "Opciones", "◀" to "Categorías")
+        when {
+            previewFocused -> KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Canales")
+            categoriesVisible -> KeyHints("OK" to "Elegir", "☰" to "Opciones", "▶" to "Canales")
+            else -> KeyHints("OK" to "Ver", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
         }
     }
 

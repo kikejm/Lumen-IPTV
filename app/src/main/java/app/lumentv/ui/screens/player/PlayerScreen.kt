@@ -80,6 +80,7 @@ import app.lumentv.ui.components.ProgressLine
 import app.lumentv.ui.components.VideoSurface
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
+import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import kotlinx.coroutines.delay
@@ -113,7 +114,9 @@ fun PlayerScreen(nav: Navigator) {
     val inPip = activity?.isInPip ?: false
     val focus = remember { FocusRequester() }
 
-    val player = remember { graph.players.create() }
+    // Desde la previsualización de TV en directo llega su reproductor con el canal ya cargado.
+    val player = remember { graph.players.takeHandOff() ?: graph.players.create() }
+    var handedBack by remember { mutableStateOf(false) }
 
     // Se guarda en el scope de la app: al salir del reproductor el scope de la pantalla ya está cancelado.
     fun saveHistory(it: PlayItem) {
@@ -138,13 +141,16 @@ fun PlayerScreen(nav: Navigator) {
         }
     }
 
-    fun load(target: PlayItem?) {
+    /** `reuse`: si el reproductor ya tiene ese stream abierto (traspaso desde la previsualización), sigue sin recargar. */
+    fun load(target: PlayItem?, reuse: Boolean = false) {
         target ?: return
         item = target
         error = null
         graph.players.claimStream(player)
-        player.setMediaItem(PlayerFactory.mediaItem(target.url), target.startPositionMs)
-        player.prepare()
+        if (!reuse || !PlayerFactory.isLoaded(player, target.url)) {
+            player.setMediaItem(PlayerFactory.mediaItem(target.url), target.startPositionMs)
+            player.prepare()
+        }
         player.playWhenReady = true
         overlay = true
         overlayTick++
@@ -184,12 +190,15 @@ fun PlayerScreen(nav: Navigator) {
         }
         player.addListener(listener)
         activity?.playerActive = true
-        load(item)
+        // Un reproductor traspasado ya está reproduciendo: sus eventos de estado no se repetirán.
+        buffering = player.playbackState != Player.STATE_READY
+        isPlaying = player.isPlaying
+        load(item, reuse = true)
         onDispose {
             item?.let { saveHistory(it) }
             activity?.playerActive = false
             player.removeListener(listener)
-            player.release()
+            if (!handedBack) player.release()
         }
     }
 
@@ -219,6 +228,16 @@ fun PlayerScreen(nav: Navigator) {
 
     fun showOverlay() { overlay = true; overlayTick++ }
     val isLive = item?.kind == ContentKind.LIVE && item?.subtitle?.startsWith("Catch-up") != true
+
+    // De vuelta a TV en directo, la previsualización se queda este reproductor y el canal sigue sin recargar.
+    // Se entrega antes de salir porque la pantalla de destino se compone antes de que esta se cierre.
+    BackHandler(enabled = !(overlay && error == null)) {
+        if (isLive && error == null && item?.channel != null && nav.previousRoute == Routes.LIVE) {
+            handedBack = true
+            graph.players.handOff(player)
+        }
+        nav.back()
+    }
 
     Box(
         Modifier

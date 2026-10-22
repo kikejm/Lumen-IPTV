@@ -2,10 +2,13 @@ package app.lumentv.player
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
@@ -63,7 +66,32 @@ class PlayerFactory(private val context: Context, private val http: OkHttpClient
         others.forEach { runCatching { it.stop() } }
     }
 
+    private val main = Handler(Looper.getMainLooper())
+    private var handedOff: ExoPlayer? = null
+    private val releaseUnclaimed = Runnable { handedOff?.release(); handedOff = null }
+
+    /**
+     * La previsualización de TV en directo entrega su reproductor a pantalla completa para que el
+     * canal siga sin recargarse. Si nadie lo recoge enseguida (p. ej. se abrió un reproductor externo), se libera.
+     */
+    fun handOff(player: ExoPlayer) {
+        main.removeCallbacks(releaseUnclaimed)
+        handedOff?.takeIf { it !== player }?.release()
+        handedOff = player
+        main.postDelayed(releaseUnclaimed, 3_000)
+    }
+
+    fun takeHandOff(): ExoPlayer? {
+        main.removeCallbacks(releaseUnclaimed)
+        return handedOff.also { handedOff = null }
+    }
+
     companion object {
+        /** El reproductor ya tiene ese stream abierto y sin error: no hace falta volver a cargarlo. */
+        fun isLoaded(player: Player, url: String): Boolean =
+            player.playbackState != Player.STATE_IDLE && player.playerError == null &&
+                player.currentMediaItem?.localConfiguration?.uri?.toString() == url
+
         fun mediaItem(url: String): MediaItem {
             val path = Uri.parse(url).path.orEmpty().lowercase()
             val builder = MediaItem.Builder().setUri(url)

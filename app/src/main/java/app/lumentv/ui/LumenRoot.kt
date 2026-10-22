@@ -154,6 +154,9 @@ private class NavigatorImpl(private val controller: NavHostController, private v
         if (!controller.popBackStack()) onExit()
     }
 
+    override val previousRoute: String?
+        get() = controller.previousBackStackEntry?.destination?.route
+
     /** Cambia de pestaña principal manteniendo Inicio como raíz (Atrás desde una pestaña vuelve a Inicio). */
     override fun replaceRoot(route: String) {
         if (route == Routes.HOME || route !in tabRoutes) {

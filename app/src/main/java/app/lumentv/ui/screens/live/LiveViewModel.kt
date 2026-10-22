@@ -109,8 +109,18 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Canal que debe sonar en la previsualización (debounce largo para no abrir streams en cada paso). */
-    val previewChannel: StateFlow<ChannelEntity?> = focusedChannel.debounce(900)
-        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+    private val _previewChannel = MutableStateFlow<ChannelEntity?>(null)
+    val previewChannel: StateFlow<ChannelEntity?> = _previewChannel
+
+    init {
+        viewModelScope.launch { focusedChannel.debounce(900).collect { _previewChannel.value = it } }
+    }
+
+    /** Enfoca y previsualiza un canal sin esperar al debounce (al volver de pantalla completa con él sonando). */
+    fun showNow(ch: ChannelEntity) {
+        focusedChannel.value = ch
+        _previewChannel.value = ch
+    }
 
     fun isCategoryLocked(id: String) = graph.parental.isLocked(ContentKind.LIVE.name, id)
 }

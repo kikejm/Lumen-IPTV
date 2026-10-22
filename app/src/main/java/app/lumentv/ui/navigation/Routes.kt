@@ -41,4 +41,7 @@ interface Navigator {
     fun go(route: String)
     fun back()
     fun replaceRoot(route: String)
+
+    /** Ruta de la pantalla a la que volvería [back], o `null` en la raíz. */
+    val previousRoute: String?
 }
