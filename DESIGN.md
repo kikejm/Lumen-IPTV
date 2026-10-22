@@ -150,6 +150,7 @@ Lumen es una app de TV que se usa **a 3 metros y solo con el mando del Fire TV**
   - **VPN**: panel de estado (330 dp) · países con bandera · servidores del país.
   - **Ajustes**: secciones a la izquierda, filas valor/acción a la derecha.
 - Pista de teclas (`KeyHints`) al pie cuando hay gestos no obvios (☰).
+- **Salir de la app**: en la pantalla raíz (Inicio, u onboarding si no hay lista), Atrás no cierra a la primera: muestra una píldora «PULSA DE NUEVO PARA SALIR» abajo al centro durante 1,5 s y solo sale si se pulsa Atrás otra vez en ese tiempo. En el resto de pantallas Atrás vuelve atrás como siempre.
 
 ## Elevation & Depth
 
@@ -165,7 +166,7 @@ Esquinas continuas: 10 dp (filas, chips grandes), 14 dp (tarjetas, previsualizac
 - `PillButton` — primario (blanco con texto negro en oscuro; acento en claro) y secundario (`surface-elevated`).
 - `CategoryColumn` — lista vertical; la categoría activa va en acento, con contador y candado si está bloqueada.
 - `VpnPill` — punto de estado + texto; abre la pantalla VPN.
-- `Chip` — etiqueta en mayúsculas sobre color al 16 % (o sólido para "EN DIRECTO").
+- `Chip` — etiqueta en mayúsculas sobre color al 16 % (o sólido, como «Mi lista»). No se marca «EN DIRECTO» sobre el vídeo: ni en la previsualización, ni en el reproductor, ni en Inicio.
 - `ProgressLine` — barra de 3 dp, pista al 35 % del terciario.
 - `GlassPanel`, `OptionsDialog` (menú ☰), `PinDialog` (teclado numérico navegable), `ConfirmDialog`, `TvTextField`.
 

@@ -67,7 +67,6 @@ import app.lumentv.data.settings.ResizeMode
 import app.lumentv.player.PlayItem
 import app.lumentv.player.PlayerFactory
 import app.lumentv.ui.components.Artwork
-import app.lumentv.ui.components.Chip
 import app.lumentv.ui.components.Gap
 import app.lumentv.ui.components.LText
 import app.lumentv.ui.components.MenuOption
@@ -267,10 +266,7 @@ fun PlayerScreen(nav: Navigator) {
                 ) {
                     item?.let { Artwork(it.image, it.title, Modifier.size(width = 72.dp, height = 46.dp), radius = 8.dp, background = Color.White.copy(alpha = 0.1f)) }
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (isLive) Chip("● En directo", c.danger, filled = true)
-                            item?.channel?.let { if (isLive) LText("${it.num}", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f)) }
-                        }
+                        item?.channel?.let { if (isLive) LText("${it.num}", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f)) }
                         LText(item?.title.orEmpty(), style = Lumen.type.title, color = Color.White, maxLines = 1)
                         item?.subtitle?.takeIf { it.isNotBlank() }?.let { LText(it, style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), maxLines = 1) }
                     }
@@ -293,7 +289,7 @@ fun PlayerScreen(nav: Navigator) {
                             LText("Después: ${fmt.time(next.startAt)} · ${next.title}", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.6f), maxLines = 1)
                         }
                         Gap(height = 4.dp)
-                        LText("▲▼ cambiar canal  ·  ☰ opciones  ·  OK pausa", style = Lumen.type.caption, color = Color.White.copy(alpha = 0.5f))
+                        LText("☰ opciones", style = Lumen.type.caption, color = Color.White.copy(alpha = 0.5f))
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                             Icon(if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))

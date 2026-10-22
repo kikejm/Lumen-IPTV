@@ -198,7 +198,6 @@ private fun ContinueCard(h: HistoryEntity, use24h: Boolean, onResume: () -> Unit
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             Box(Modifier.width(200.dp).aspectRatio(16f / 9f)) {
                 Artwork(h.image, h.title, Modifier.fillMaxSize(), contentScale = if (h.kind == ContentKind.LIVE) ContentScale.Fit else ContentScale.Crop)
-                if (h.kind == ContentKind.LIVE) Chip("● En directo", c.danger, filled = true, modifier = Modifier.padding(8.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(
