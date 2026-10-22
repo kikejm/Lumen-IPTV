@@ -21,6 +21,8 @@ fun VideoSurface(player: Player?, modifier: Modifier = Modifier, resizeMode: Res
                 useController = false
                 setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                 setKeepContentOnPlayerReset(true)
+                // Al parar o reconectar se queda congelada la última imagen en vez de un fundido a negro.
+                setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                 keepScreenOn = true
                 isFocusable = false
                 isFocusableInTouchMode = false

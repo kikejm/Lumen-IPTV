@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.AspectRatio
@@ -41,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -83,8 +85,13 @@ import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private const val MAX_RETRIES = 5
+private const val RETRY_SECONDS = 3
+private const val STALL_TIMEOUT_MS = 20_000L
 
 @Composable
 fun PlayerScreen(nav: Navigator) {
@@ -118,11 +125,29 @@ fun PlayerScreen(nav: Navigator) {
     val player = remember { graph.players.takeHandOff() ?: graph.players.create() }
     var handedBack by remember { mutableStateOf(false) }
 
+    // Última posición y duración válidas del elemento actual. Tras un error ExoPlayer pierde la duración:
+    // sin esto el historial se guardaba con duración 0 y la película desaparecía de «Continuar viendo».
+    var knownPosition by remember { mutableLongStateOf(0L) }
+    var knownDuration by remember { mutableLongStateOf(0L) }
+    // Si el elemento actual ha llegado a reproducirse (para distinguir un corte de un arranque lento).
+    var hasPlayed by remember { mutableStateOf(false) }
+
+    fun snapshotProgress() {
+        val d = player.duration
+        if (d != C.TIME_UNSET && d > 0 && player.playerError == null && player.playbackState != Player.STATE_IDLE) {
+            knownPosition = player.currentPosition.coerceAtLeast(0)
+            knownDuration = d
+        }
+    }
+
     // Se guarda en el scope de la app: al salir del reproductor el scope de la pantalla ya está cancelado.
     fun saveHistory(it: PlayItem) {
         val known = playlist
-        val pos = player.currentPosition.coerceAtLeast(0)
-        val dur = player.duration.takeIf { d -> d != C.TIME_UNSET && d > 0 } ?: 0
+        snapshotProgress()
+        val pos = knownPosition
+        val dur = knownDuration
+        // Sin duración aún (arrancando o fallando desde el principio) no se pisa lo que ya hubiera guardado.
+        if (it.kind != ContentKind.LIVE && dur == 0L) return
         graph.appScope.launch {
             val p = known ?: graph.playlists.activeNow() ?: return@launch
             graph.library.record(
@@ -144,6 +169,11 @@ fun PlayerScreen(nav: Navigator) {
     /** `reuse`: si el reproductor ya tiene ese stream abierto (traspaso desde la previsualización), sigue sin recargar. */
     fun load(target: PlayItem?, reuse: Boolean = false) {
         target ?: return
+        if (target.itemId != item?.itemId || target.kind != item?.kind) {
+            knownPosition = target.startPositionMs
+            knownDuration = 0
+            hasPlayed = false
+        }
         item = target
         error = null
         graph.players.claimStream(player)
@@ -157,8 +187,56 @@ fun PlayerScreen(nav: Navigator) {
         saveHistory(target)
     }
 
+    // Reconexión tras un error (o tras STALL_TIMEOUT_MS cargando): hasta MAX_RETRIES intentos,
+    // uno cada RETRY_SECONDS, con la cuenta atrás al pie. Agotados, se muestra el error.
+    var retryJob by remember { mutableStateOf<Job?>(null) }
+    var retryIn by remember { mutableIntStateOf(0) }
+
+    fun cancelRetry() {
+        retryJob?.cancel()
+        retryJob = null
+        retryIn = 0
+    }
+
+    /** Vuelve a abrir el elemento actual; películas y episodios, en el punto en que estaban. */
+    fun reload() {
+        val current = item ?: return
+        snapshotProgress()
+        load(if (current.kind == ContentKind.LIVE) current else current.copy(startPositionMs = knownPosition))
+    }
+
+    fun scheduleRetry(e: PlaybackException?) {
+        item ?: return
+        if (retryJob?.isActive == true) return
+        snapshotProgress()
+        item?.let { saveHistory(it) }
+        if (retries >= MAX_RETRIES) {
+            player.stop()
+            error = e?.let(::humanError) ?: "No responde: lleva más de ${STALL_TIMEOUT_MS / 1000} s sin cargar."
+            return
+        }
+        retries++
+        player.stop() // la última imagen se queda congelada en pantalla (VideoSurface no la tapa)
+        retryJob = scope.launch {
+            for (s in RETRY_SECONDS downTo 1) {
+                retryIn = s
+                delay(1_000)
+            }
+            retryIn = 0
+            retryJob = null
+            reload()
+        }
+    }
+
+    fun retryNow() {
+        cancelRetry()
+        retries = 0
+        reload()
+    }
+
     fun zap(delta: Int) {
         item?.let { saveHistory(it) }
+        cancelRetry()
         retries = 0
         load(session.move(delta))
     }
@@ -168,24 +246,19 @@ fun PlayerScreen(nav: Navigator) {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlaybackStateChanged(state: Int) {
                 buffering = state == Player.STATE_BUFFERING
-                if (state == Player.STATE_READY) retries = 0
+                if (state == Player.STATE_READY) {
+                    retries = 0
+                    hasPlayed = true
+                }
                 if (state == Player.STATE_ENDED) {
                     val current = item
                     if (current?.kind == ContentKind.EPISODE && session.hasNext()) zap(1)
                     else if (current?.kind == ContentKind.LIVE) load(current) // stream cortado: reconecta
                 }
             }
-            override fun onPlayerError(e: PlaybackException) {
-                val current = item
-                // En directo los cortes son habituales, y un 403/426 suele ser la conexión anterior que el
-                // proveedor aún no ha soltado: reintenta un par de veces antes de mostrar el error.
-                if (current != null && retries < 2 && (current.kind == ContentKind.LIVE || e.isConnectionRefused())) {
-                    retries++
-                    scope.launch { delay(2_000); load(current) }
-                } else {
-                    error = humanError(e)
-                }
-            }
+            // Cortes en directo, un 403/426 de la conexión anterior aún abierta, un servidor saturado…
+            // casi todo se arregla volviendo a conectar al poco.
+            override fun onPlayerError(e: PlaybackException) = scheduleRetry(e)
             override fun onTracksChanged(t: Tracks) { tracks = t }
         }
         player.addListener(listener)
@@ -206,8 +279,11 @@ fun PlayerScreen(nav: Navigator) {
     LaunchedEffect(Unit) {
         var tick = 0
         while (true) {
-            position = player.currentPosition
-            duration = player.duration.takeIf { it != C.TIME_UNSET } ?: 0
+            snapshotProgress()
+            // Parado (reconectando o con error) ExoPlayer no sabe la duración: se muestra la última conocida.
+            val stopped = player.playbackState == Player.STATE_IDLE
+            position = if (stopped) knownPosition else player.currentPosition
+            duration = player.duration.takeIf { !stopped && it != C.TIME_UNSET } ?: knownDuration
             if (++tick % 30 == 0) item?.takeIf { it.kind != ContentKind.LIVE }?.let { saveHistory(it) }
             delay(500)
         }
@@ -222,12 +298,25 @@ fun PlayerScreen(nav: Navigator) {
     LaunchedEffect(overlayTick, overlay, isPlaying) {
         if (overlay && isPlaying) { delay(5_000); overlay = false }
     }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    // Con el error a la vista el foco va a «Reintentar» (◀ ▶ entre los botones, sin mover la película).
+    val errorFocus = remember { FocusRequester() }
+    LaunchedEffect(error != null) {
+        if (error != null) runCatching { errorFocus.requestFocus() } else runCatching { focus.requestFocus() }
+    }
 
     BackHandler(enabled = overlay && error == null) { overlay = false }
 
     fun showOverlay() { overlay = true; overlayTick++ }
     val isLive = item?.kind == ContentKind.LIVE && item?.subtitle?.startsWith("Catch-up") != true
+
+    // Cargar sin respuesta cuenta como error: a los 20 s se reconecta (un corte de conexión suele dejar a
+    // ExoPlayer esperando indefinidamente, sin dar error). En directo, siempre; en películas y episodios,
+    // solo si ya se estaban viendo: un servidor lento puede tardar más en arrancar y no es un fallo.
+    LaunchedEffect(buffering, retries, error, hasPlayed) {
+        if (!buffering || error != null || (!isLive && !hasPlayed)) return@LaunchedEffect
+        delay(STALL_TIMEOUT_MS)
+        if (buffering && retryJob == null) scheduleRetry(null)
+    }
 
     // De vuelta a TV en directo, la previsualización se queda este reproductor y el canal sigue sin recargar.
     // Se entrega antes de salir porque la pantalla de destino se compone antes de que esta se cierre.
@@ -253,7 +342,7 @@ fun PlayerScreen(nav: Navigator) {
                     Key.DirectionLeft, Key.MediaRewind -> { if (!isLive) player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0)); showOverlay(); true }
                     Key.DirectionRight, Key.MediaFastForward -> { if (!isLive) player.seekTo(player.currentPosition + 30_000); showOverlay(); true }
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        if (error != null) { load(item); true }
+                        if (error != null) { retryNow(); true }
                         else if (!overlay) { showOverlay(); true }
                         else { if (player.isPlaying) player.pause() else player.play(); showOverlay(); true }
                     }
@@ -265,9 +354,12 @@ fun PlayerScreen(nav: Navigator) {
     ) {
         VideoSurface(player, Modifier.fillMaxSize(), resize)
 
-        if (buffering && error == null) PlayerLoading(Modifier.align(Alignment.Center))
+        if ((buffering || retryIn > 0) && error == null) PlayerLoading(Modifier.align(Alignment.Center))
+
 
         error?.let { msg ->
+            // Velo sobre la última imagen congelada para que el mensaje se lea.
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)))
             Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = c.danger, modifier = Modifier.size(48.dp))
                 LText("No se puede reproducir", style = Lumen.type.title, color = Color.White)
@@ -276,7 +368,7 @@ fun PlayerScreen(nav: Navigator) {
             }
         }
 
-        AnimatedVisibility(visible = overlay && !inPip, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = overlay && !inPip && error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
                 // Degradados superior e inferior para legibilidad.
                 Box(Modifier.fillMaxWidth().fillMaxHeight(0.35f).align(Alignment.TopCenter).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent))))
@@ -324,6 +416,18 @@ fun PlayerScreen(nav: Navigator) {
                     }
                 }
             }
+        }
+
+        // Encima del overlay para que el degradado no lo apague.
+        if (retryIn > 0 && error == null) {
+            LText(
+                "Error de reproducción, vuelve a conectar en ${retryIn}s ($retries/$MAX_RETRIES)",
+                style = Lumen.type.callout,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = LumenDimens.safeVertical + 8.dp)
+                    .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.7f))
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+            )
         }
     }
 
@@ -376,7 +480,7 @@ fun PlayerScreen(nav: Navigator) {
     if (error != null) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PillButton("Reintentar", onClick = { retries = 0; load(item) }, primary = true)
+                PillButton("Reintentar", onClick = ::retryNow, primary = true, modifier = Modifier.focusRequester(errorFocus))
                 PillButton("Salir", onClick = { nav.back() })
             }
         }
@@ -416,4 +520,3 @@ private fun humanError(e: PlaybackException): String = when (e.errorCode) {
 @OptIn(UnstableApi::class)
 private fun PlaybackException.httpCode(): Int? = (cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
 
-private fun PlaybackException.isConnectionRefused(): Boolean = httpCode() in setOf(403, 426, 458, 509)

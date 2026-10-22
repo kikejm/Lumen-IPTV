@@ -45,6 +45,20 @@ import app.lumentv.ui.playChannels
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.tv.material3.Icon
+import app.lumentv.data.db.ChannelEntity
+import app.lumentv.data.db.ContentKind
+import app.lumentv.ui.components.KeyHints
+import app.lumentv.ui.components.MenuOption
+import app.lumentv.ui.components.OptionsDialog
+import app.lumentv.ui.onMenuKey
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 
 /** Búsqueda maestra en canales, películas y series de la lista activa. */
 @Composable
@@ -55,6 +69,11 @@ fun SearchScreen(nav: Navigator) {
     var query by rememberSaveable { mutableStateOf("") }
     var results by remember { mutableStateOf(SearchResults()) }
     val field = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    val favorites by remember(playlist?.id) {
+        playlist?.let { graph.library.favoriteIds(it.id, ContentKind.LIVE) } ?: flowOf(emptySet())
+    }.collectAsState(initial = emptySet())
+    var channelMenu by remember { mutableStateOf<ChannelEntity?>(null) }
     val c = Lumen.colors
 
     LaunchedEffect(query, playlist?.id) {
@@ -75,17 +94,25 @@ fun SearchScreen(nav: Navigator) {
             EmptyState(Icons.Rounded.Search, "Sin resultados", "Prueba con otro término.")
             return@Column
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             if (results.channels.isNotEmpty()) item {
                 Column {
                     SectionTitle("Canales (${results.channels.size})")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(4.dp)) {
                         items(results.channels, key = { it.streamId }) { ch ->
-                            FocusSurface(onClick = { playlist?.let { graph.playChannels(context, nav, it, results.channels, results.channels.indexOf(ch)) } }, modifier = Modifier.width(170.dp)) {
+                            // Mantener OK (o ☰) abre el menú de favoritos.
+                            FocusSurface(
+                                onClick = { playlist?.let { graph.playChannels(context, nav, it, results.channels, results.channels.indexOf(ch)) } },
+                                onLongClick = { channelMenu = ch },
+                                modifier = Modifier.width(170.dp).onMenuKey { channelMenu = ch },
+                            ) {
                                 Column(Modifier.padding(10.dp)) {
                                     Artwork(ch.logo, ch.name, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                                     Gap(height = 6.dp)
-                                    LText(ch.name, style = Lumen.type.caption, maxLines = 1)
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        LText(ch.name, style = Lumen.type.caption, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+                                        if (ch.streamId in favorites) Icon(Icons.Rounded.Favorite, contentDescription = "Favorito", tint = c.danger, modifier = Modifier.size(12.dp))
+                                    }
                                 }
                             }
                         }
@@ -113,6 +140,20 @@ fun SearchScreen(nav: Navigator) {
                 }
             }
         }
+        if (results.channels.isNotEmpty()) KeyHints("OK" to "Ver", "☰" to "Favoritos (o mantén OK)")
+    }
+
+    channelMenu?.let { ch ->
+        val isFav = ch.streamId in favorites
+        OptionsDialog(
+            ch.name,
+            listOf(
+                MenuOption(if (isFav) "Quitar de favoritos" else "Añadir a favoritos", if (isFav) Icons.Rounded.FavoriteBorder else Icons.Rounded.Favorite) {
+                    playlist?.let { p -> scope.launch { graph.library.toggleFavorite(p.id, ContentKind.LIVE, ch.streamId) } }
+                },
+            ),
+            onDismiss = { channelMenu = null },
+        )
     }
 }
 

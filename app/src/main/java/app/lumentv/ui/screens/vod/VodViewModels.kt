@@ -30,14 +30,20 @@ class MoviesViewModel(private val graph: AppGraph) : ViewModel() {
     val favoriteIds = playlist.filterNotNull().flatMapLatest { graph.library.favoriteIds(it.id, ContentKind.VOD) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
+    /** Películas reproducidas, de la más reciente a la más antigua. */
+    private val recent = playlist.filterNotNull().flatMapLatest { graph.library.history(it.id, ContentKind.VOD, 40) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val categories: StateFlow<List<CategoryItem>> = combine(
         playlist.filterNotNull().flatMapLatest { graph.catalog.categories(it.id, ContentKind.VOD) },
         favoriteIds,
+        recent,
         graph.settings.settings,
-    ) { cats, favs, _ ->
-        listOf(
+    ) { cats, favs, recentItems, _ ->
+        // «Recientes» solo aparece tras ver la primera película.
+        listOfNotNull(
             CategoryItem(CAT_ALL, "Todas"),
-            CategoryItem(CAT_RECENT, "Continuar viendo"),
+            recentItems.takeIf { it.isNotEmpty() }?.let { CategoryItem(CAT_RECENT, "Recientes", it.size) },
             CategoryItem(CAT_FAVORITES, "Mi lista", favs.size),
         ) + cats.map { CategoryItem(it.categoryId, it.name, locked = graph.parental.isMarkedLocked(ContentKind.VOD.name, it.categoryId)) }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -47,7 +53,7 @@ class MoviesViewModel(private val graph: AppGraph) : ViewModel() {
             when (cat) {
                 CAT_ALL -> graph.catalog.movies(p.id, null)
                 CAT_FAVORITES -> favoriteIds.mapLatest { graph.catalog.moviesByIds(p.id, it.toList()) }
-                CAT_RECENT -> graph.library.history(p.id, ContentKind.VOD, 40).mapLatest { h ->
+                CAT_RECENT -> recent.mapLatest { h ->
                     val byId = graph.catalog.moviesByIds(p.id, h.map { it.itemId }).associateBy { it.streamId }
                     h.mapNotNull { byId[it.itemId] }
                 }

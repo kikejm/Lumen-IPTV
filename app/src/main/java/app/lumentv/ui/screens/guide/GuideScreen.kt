@@ -19,6 +19,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -82,6 +88,22 @@ fun GuideScreen(nav: Navigator) {
     val windowEnd = windowStart + WINDOW_MIN * 60_000L
     var detail by remember { mutableStateOf<Pair<ChannelEntity, Program>?>(null) }
 
+    // Orden vertical del foco: pestañas → categorías → ‹ Ahora › → parrilla (y al revés). Sin esto, ▼ desde
+    // «Inicio» o «Guía» saltaba las categorías porque la más cercana en línea recta era la fila de tiempos.
+    val tabFocus = remember { FocusRequester() }
+    val categoryFocus = remember { FocusRequester() }
+    val nowFocus = remember { FocusRequester() }
+    val visibleCategories = categories.filterNot { it.locked && vm.isCategoryLocked(it.id) }
+    val categoryState = rememberLazyListState()
+    var categoriesFocused by remember { mutableStateOf(false) }
+    // Fuera de la fila, la categoría elegida vuelve a la vista: es el destino de ▼ y ▲, y en una LazyRow
+    // solo los elementos visibles pueden recibir el foco.
+    LaunchedEffect(selected, categoriesFocused, visibleCategories.size) {
+        val index = visibleCategories.indexOfFirst { it.id == selected }
+        if (!categoriesFocused && index >= 0) categoryState.scrollToItem(index)
+    }
+    LaunchedEffect(Unit) { runCatching { tabFocus.requestFocus() } }
+
     BoxWithConstraints(Modifier.fillMaxSize().background(c.background)) {
         val pxPerMin = (maxWidth - LumenDimens.safeHorizontal * 2 - CHANNEL_COL - 8.dp) / WINDOW_MIN.toFloat()
         CompositionLocalProvider(LocalPxPerMin provides pxPerMin) {
@@ -89,13 +111,25 @@ fun GuideScreen(nav: Navigator) {
                 Modifier.fillMaxSize().background(c.background)
                     .padding(horizontal = LumenDimens.safeHorizontal, vertical = LumenDimens.safeVertical),
             ) {
-                TopBar(nav, Routes.GUIDE)
+                TopBar(nav, Routes.GUIDE, currentTabFocus = tabFocus, downFocus = categoryFocus)
                 Gap(height = 12.dp)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(4.dp)) {
-                    items(categories.filterNot { it.locked && vm.isCategoryLocked(it.id) }, key = { it.id }) { cat ->
+                LazyRow(
+                    state = categoryState,
+                    modifier = Modifier.onFocusChanged { categoriesFocused = it.hasFocus },
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(4.dp),
+                ) {
+                    items(visibleCategories, key = { it.id }) { cat ->
                         val sel = cat.id == selected
                         FocusSurface(
                             onClick = { vm.selectedCategory.value = cat.id },
+                            // En cada píldora: las propiedades de foco puestas en la LazyRow no llegan a sus elementos.
+                            modifier = Modifier
+                                .focusProperties {
+                                    up = tabFocus
+                                    down = nowFocus
+                                }
+                                .then(if (sel) Modifier.focusRequester(categoryFocus) else Modifier),
                             radius = 50.dp,
                             containerColor = if (sel) c.accent else c.surface,
                             focusedContainerColor = if (sel) c.accent else c.surfaceFocused,
@@ -108,9 +142,9 @@ fun GuideScreen(nav: Navigator) {
                 Gap(height = 10.dp)
                 // Cabecera de tiempos
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row(Modifier.width(CHANNEL_COL), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.width(CHANNEL_COL).focusProperties { up = categoryFocus }, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         IconCircleButton(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "1 hora antes", onClick = { windowStart -= 60 * 60_000L })
-                        PillButton("Ahora", onClick = { windowStart = alignHalfHour(System.currentTimeMillis()) }, icon = Icons.Rounded.Schedule)
+                        PillButton("Ahora", onClick = { windowStart = alignHalfHour(System.currentTimeMillis()) }, icon = Icons.Rounded.Schedule, modifier = Modifier.focusRequester(nowFocus))
                         IconCircleButton(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "1 hora después", onClick = { windowStart += 60 * 60_000L })
                     }
                     Box(Modifier.weight(1f).height(24.dp)) {

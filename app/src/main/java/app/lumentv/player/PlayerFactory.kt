@@ -87,9 +87,9 @@ class PlayerFactory(private val context: Context, private val http: OkHttpClient
     }
 
     companion object {
-        /** El reproductor ya tiene ese stream abierto y sin error: no hace falta volver a cargarlo. */
+        /** El reproductor ya tiene ese stream abierto (cargando o sonando) y sin error: no hace falta volver a cargarlo. */
         fun isLoaded(player: Player, url: String): Boolean =
-            player.playbackState != Player.STATE_IDLE && player.playerError == null &&
+            (player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_READY) && player.playerError == null &&
                 player.currentMediaItem?.localConfiguration?.uri?.toString() == url
 
         fun mediaItem(url: String): MediaItem {

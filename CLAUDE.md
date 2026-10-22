@@ -29,7 +29,7 @@ export JAVA_HOME="$LOCALAPPDATA/Programs/jdk-17.0.20.1+1"; export PATH="$JAVA_HO
 
 - **Idioma**: textos de UI y documentación en **español**; identificadores y código en inglés.
 - **Solo mando**: todo elemento interactivo debe ser enfocable con D-pad. Usa `FocusSurface` (ui/components) — nunca `Modifier.clickable` suelto ni componentes táctiles de Material 3.
-- **Tecla ☰ (Menu)** = opciones contextuales (`Modifier.onMenuKey`). No existe pulsación larga fiable en el mando del Fire TV.
+- **Tecla ☰ (Menu)** = opciones contextuales (`Modifier.onMenuKey`). La pulsación larga de OK no es fiable en el mando del Fire TV: si se ofrece (`onLongClick`), que sea un atajo y la misma acción esté también en ☰.
 - **Colores y tipografía** solo vía `Lumen.colors` / `Lumen.type`. Nada de `Color(0x…)` en pantallas salvo overlays de vídeo (blanco/negro).
 - **Room es la única fuente de verdad** del catálogo: las pantallas observan Flows de los DAOs; la red solo escribe en Room (excepto EPG corto y fichas de VOD/series, que se piden bajo demanda).
 - Listas grandes de Xtream **siempre en streaming** (`XtreamClient.streamEach` + `android.util.JsonReader`). Nunca `parseToJsonElement` sobre `get_live_streams`/`get_vod_streams`/`get_series`: el Fire Stick se queda sin memoria.

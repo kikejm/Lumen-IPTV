@@ -74,6 +74,7 @@ fun FocusSurface(
     focusedContentColor: Color = Lumen.colors.textPrimary,
     focusedScale: Float = LumenDimens.focusScale,
     showRing: Boolean = true,
+    showGlow: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(radius)
@@ -95,7 +96,7 @@ fun FocusSurface(
             focusedBorder = if (showRing) Border(BorderStroke(2.dp, Lumen.colors.focusRing), shape = shape) else Border.None,
         ),
         glow = ClickableSurfaceDefaults.glow(
-            focusedGlow = Glow(elevationColor = Lumen.colors.focusRing.copy(alpha = 0.18f), elevation = 12.dp),
+            focusedGlow = if (showGlow) Glow(elevationColor = Lumen.colors.focusRing.copy(alpha = 0.18f), elevation = 12.dp) else Glow.None,
         ),
         content = content,
     )

@@ -30,4 +30,6 @@ class LibraryRepository(private val db: LumenDatabase) {
     suspend fun record(entry: HistoryEntity) = dao.upsertHistory(entry.copy(watchedAt = System.currentTimeMillis()))
 
     suspend fun clearHistory(pid: Long) = dao.clearHistory(pid)
+
+    suspend fun removeHistory(pid: Long, kind: ContentKind, itemId: String) = dao.removeHistory(pid, kind, itemId)
 }

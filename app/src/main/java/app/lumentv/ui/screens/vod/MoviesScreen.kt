@@ -2,10 +2,12 @@ package app.lumentv.ui.screens.vod
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.HistoryToggleOff
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,10 +79,20 @@ fun MoviesScreen(nav: Navigator) {
     }
     itemMenu?.let { item ->
         val fav = item.id in favorites
-        OptionsDialog(item.title, listOf(
-            MenuOption(if (fav) "Quitar de Mi lista" else "Añadir a Mi lista", if (fav) Icons.Rounded.Remove else Icons.Rounded.Add) {
+        OptionsDialog(item.title, buildList {
+            add(MenuOption(if (fav) "Quitar de Mi lista" else "Añadir a Mi lista", if (fav) Icons.Rounded.Remove else Icons.Rounded.Add) {
                 playlist?.let { p -> scope.launch { graph.library.toggleFavorite(p.id, ContentKind.VOD, item.id) } }
-            },
-        ), onDismiss = { itemMenu = null })
+            })
+            if (selected == CAT_RECENT) {
+                add(MenuOption("Quitar de Recientes", Icons.Rounded.HistoryToggleOff) {
+                    playlist?.let { p -> scope.launch { graph.library.removeHistory(p.id, ContentKind.VOD, item.id) } }
+                })
+            }
+        }, onDismiss = { itemMenu = null })
+    }
+
+    // Si se vacía «Recientes» (o desaparece otra categoría elegida), vuelve a «Todas».
+    LaunchedEffect(categories, selected) {
+        if (categories.isNotEmpty() && categories.none { it.id == selected }) vm.selectedCategory.value = CAT_ALL
     }
 }

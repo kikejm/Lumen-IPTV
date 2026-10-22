@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -142,9 +143,14 @@ fun LiveScreen(nav: Navigator) {
     var previewState by remember { mutableIntStateOf(player.playbackState) }
     var previewFailed by remember { mutableStateOf(false) }
     var previewRetry by remember { mutableIntStateOf(0) }
+    // Un directo que termina es un corte de emisión: se vuelve a conectar.
+    var previewReconnect by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(state: Int) { previewState = state }
+            override fun onPlaybackStateChanged(state: Int) {
+                previewState = state
+                if (state == Player.STATE_ENDED) previewReconnect++
+            }
             override fun onPlayerError(error: PlaybackException) {
                 // Un rechazo justo al volver del reproductor suele ser la conexión anterior aún abierta: un reintento.
                 if (previewRetry < 1) previewRetry++ else previewFailed = true
@@ -170,7 +176,7 @@ fun LiveScreen(nav: Navigator) {
         graph.playChannels(context, nav, p, list, index)
     }
     LaunchedEffect(preview) { previewRetry = 0 }
-    LaunchedEffect(preview, playlist, previewRetry) {
+    LaunchedEffect(preview, playlist, previewRetry, previewReconnect) {
         val p = playlist ?: return@LaunchedEffect
         val ch = preview ?: return@LaunchedEffect
         val url = graph.streams.live(p, ch).url
@@ -314,12 +320,14 @@ fun LiveScreen(nav: Navigator) {
                                     channel = ch,
                                     playlist = playlist,
                                     isFavorite = ch.streamId in favorites,
+                                    isPreviewing = ch.streamId == preview?.streamId,
                                     fmt = fmt,
                                     onFocus = {
-                                        vm.focusedChannel.value = ch
+                                        vm.onChannelFocused(ch)
                                         showCategories = false
                                     },
-                                    onClick = { watch(channels, index) },
+                                    // OK sobre otro canal lo pasa a la previsualización; sobre el que ya suena, a pantalla completa.
+                                    onClick = { if (ch.streamId == preview?.streamId) watch(channels, index) else vm.preview(ch) },
                                     onMenu = { channelMenu = ch },
                                 )
                             }
@@ -332,31 +340,10 @@ fun LiveScreen(nav: Navigator) {
 
             // 3) Previsualización + EPG
             Column(Modifier.weight(previewWeight).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                FocusSurface(
-                    onClick = {
-                        preview?.let { ch ->
-                            val index = channels.indexOfFirst { it.streamId == ch.streamId }
-                            if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                        .focusRequester(previewFocus)
-                        .onFocusChanged { previewFocused = it.isFocused }
-                        .onMenuKey { preview?.let { channelMenu = it } }
-                        .onPreviewKeyEvent { e ->
-                            if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
-                                runCatching { channelFocus.requestFocus() }
-                                true
-                            } else {
-                                false
-                            }
-                        },
-                    radius = LumenDimens.radiusMedium,
-                    containerColor = Color.Black,
-                    focusedContainerColor = Color.Black,
-                    focusedScale = 1.02f,
-                ) {
-                    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(LumenDimens.radiusMedium))) {
+                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+                    // El vídeo va fuera de la superficie enfocable: la capa que esta pinta (escala, halo) tapa el
+                    // hueco del SurfaceView y la previsualización se oía pero se veía negra.
+                    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
                         if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
                         when {
                             preview == null -> Unit
@@ -364,6 +351,32 @@ fun LiveScreen(nav: Navigator) {
                             previewState != Player.STATE_READY -> LoadingSpinner(Modifier.align(Alignment.Center))
                         }
                     }
+                    // Encima, transparente: solo aporta el foco y el anillo.
+                    FocusSurface(
+                        onClick = {
+                            preview?.let { ch ->
+                                val index = channels.indexOfFirst { it.streamId == ch.streamId }
+                                if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                            .focusRequester(previewFocus)
+                            .onFocusChanged { previewFocused = it.isFocused }
+                            .onMenuKey { preview?.let { channelMenu = it } }
+                            .onPreviewKeyEvent { e ->
+                                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                                    runCatching { channelFocus.requestFocus() }
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                        radius = LumenDimens.radiusMedium,
+                        containerColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        focusedScale = 1f,
+                        showGlow = false,
+                    ) {}
                 }
                 focused?.let { ch ->
                     LText(ch.name, style = Lumen.type.headline, maxLines = 1)
@@ -391,7 +404,9 @@ fun LiveScreen(nav: Navigator) {
         when {
             previewFocused -> KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Canales")
             categoriesVisible -> KeyHints("OK" to "Elegir", "☰" to "Opciones", "▶" to "Canales")
-            else -> KeyHints("OK" to "Ver", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
+            focused != null && focused?.streamId == preview?.streamId ->
+                KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
+            else -> KeyHints("OK" to "Previsualizar", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
         }
     }
 
@@ -488,6 +503,7 @@ private fun ChannelRow(
     channel: ChannelEntity,
     playlist: PlaylistEntity?,
     isFavorite: Boolean,
+    isPreviewing: Boolean,
     fmt: TimeFormatter,
     onFocus: () -> Unit,
     onClick: () -> Unit,
@@ -512,6 +528,7 @@ private fun ChannelRow(
             Artwork(channel.logo, channel.name, Modifier.size(width = 52.dp, height = 34.dp), radius = 6.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (isPreviewing) Icon(Icons.Rounded.PlayArrow, contentDescription = "En la previsualización", tint = c.accent, modifier = Modifier.size(16.dp))
                     LText(channel.name, style = Lumen.type.callout, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (isFavorite) Icon(Icons.Rounded.Favorite, contentDescription = "Favorito", tint = c.danger, modifier = Modifier.size(14.dp))
                     if (channel.tvArchive) Icon(Icons.Rounded.History, contentDescription = "Catch-up", tint = c.warning, modifier = Modifier.size(14.dp))

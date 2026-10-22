@@ -135,8 +135,10 @@ Lumen es una app de TV que se usa **a 3 metros y solo con el mando del Fire TV**
 - Barra superior común (`TopBar`): marca · pestañas en *segmented control* · píldora VPN · buscar · ajustes · reloj.
 - Patrones de pantalla:
   - **Inicio**: "Sigue viendo" (tarjeta ancha) → "Accesos" (6 mosaicos) → fila de favoritos → pie con estado de la lista.
-  - **TV en directo**: canales con programa actual · previsualización 16:9 + EPG, que se lleva el espacio sobrante. ▶ desde los canales lleva el foco (anillo) a la previsualización; OK ahí la abre a pantalla completa sin cortar el vídeo, y al volver con Atrás sigue sonando en la previsualización; ◀ vuelve al canal. Las categorías (190 dp) están plegadas: ◀ desde los canales las despliega a la izquierda; ▶ o elegir una las pliega y devuelve el foco a los canales. Entre ambas columnas hay siempre un separador (línea + asa + flecha ‹/›) que indica que hay un panel plegado. Encima de los canales, píldoras de calidad (Todas · FHD · FHD HEVC · HD · SD, solo las presentes en la categoría; cada canal cae en una sola) deducidas del nombre del canal.
-  - **Cine / Series**: fondo con el arte del elemento enfocado, *hero* con título/metadatos, raíl de categorías y rejilla de pósters 2:3.
+  - **TV en directo**: canales con programa actual · previsualización 16:9 + EPG, que se lleva el espacio sobrante. La previsualización no sigue al foco: moverse por canales o categorías no la cambia; OK sobre otro canal lo pasa a la previsualización (marcado con ▶ en acento en la lista) y OK sobre el que ya suena lo abre a pantalla completa. ▶ desde los canales lleva el foco (anillo) a la previsualización; OK ahí la abre a pantalla completa sin cortar el vídeo, y al volver con Atrás sigue sonando en la previsualización; ◀ vuelve al canal. Las categorías (190 dp) están plegadas: ◀ desde los canales las despliega a la izquierda; ▶ o elegir una las pliega y devuelve el foco a los canales. Entre ambas columnas hay siempre un separador (línea + asa + flecha ‹/›) que indica que hay un panel plegado. Encima de los canales, píldoras de calidad (Todas · FHD · FHD HEVC · HD · SD, solo las presentes en la categoría; cada canal cae en una sola) deducidas del nombre del canal.
+  - **Cine / Series**: fondo con el arte del elemento enfocado, *hero* con título/metadatos, raíl de categorías y rejilla de pósters 2:3. Mantener OK (o ☰) sobre un póster abre «Añadir/Quitar de Mi lista». En Cine, la categoría **Recientes** (películas reproducidas, la última primero) solo aparece tras ver la primera película; allí el menú añade «Quitar de Recientes».
+  - **Reproductor**: ante un error (o 20 s cargando sin respuesta) reconecta hasta 5 veces, una cada 3 s, con la última imagen congelada y una píldora al pie «Error de reproducción, vuelve a conectar en 3s (1/5)»; películas y episodios vuelven al minuto en que estaban. Agotados los intentos muestra el error con el foco en «Reintentar» (◀ ▶ cambian de botón).
+  - **Guía**: pestañas → píldoras de categoría → ‹ Ahora › → parrilla, en ese orden con ▲▼ (rutas de foco explícitas: la búsqueda geométrica saltaba las categorías). Al entrar, el foco está en la pestaña «Guía».
   - **VPN**: panel de estado (330 dp) · países con bandera · servidores del país.
   - **Ajustes**: secciones a la izquierda, filas valor/acción a la derecha.
 - Pista de teclas (`KeyHints`) al pie cuando hay gestos no obvios (☰).
@@ -152,7 +154,7 @@ Esquinas continuas: 10 dp (filas, chips grandes), 14 dp (tarjetas, previsualizac
 
 ## Components
 
-- `FocusSurface` — base de todo lo navegable (envuelve `androidx.tv.material3.Surface`). Parámetros: radio, colores reposo/foco, escala, anillo.
+- `FocusSurface` — base de todo lo navegable (envuelve `androidx.tv.material3.Surface`). Parámetros: radio, colores reposo/foco, escala, anillo, halo. **Nunca metas un `VideoSurface` dentro**: la capa de la superficie tapa el hueco del SurfaceView y el vídeo se ve negro (se oye). Pon el vídeo debajo y una `FocusSurface` transparente encima, sin escala ni halo.
 - `PillButton` — primario (blanco con texto negro) y secundario (`surface-elevated`).
 - `CategoryColumn` — lista vertical; la categoría activa va en acento, con contador y candado si está bloqueada.
 - `VpnPill` — punto de estado + texto; abre la pantalla VPN.

@@ -145,6 +145,7 @@ fun PosterBrowser(
                         items(items, key = { it.id }) { item ->
                             FocusSurface(
                                 onClick = { onOpen(item) },
+                                onLongClick = { onItemMenu(item) }, // mantener OK = ☰
                                 modifier = (if (item.id == items.first().id) Modifier.focusRequester(firstPoster) else Modifier)
                                     .aspectRatio(2f / 3f)
                                     .onFocusChanged { if (it.isFocused) onFocus(item) }

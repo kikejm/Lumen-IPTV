@@ -17,6 +17,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -33,12 +36,21 @@ import app.lumentv.vpn.VpnState
  * Si [title] no es null se muestra un título en lugar de las pestañas (pantallas secundarias).
  */
 @Composable
-fun TopBar(nav: Navigator, currentRoute: String, modifier: Modifier = Modifier, title: String? = null) {
+fun TopBar(
+    nav: Navigator,
+    currentRoute: String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    /** Se engancha a la pestaña de la pantalla actual (para darle el foco o volver a ella con ▲). */
+    currentTabFocus: FocusRequester? = null,
+    /** Destino de ▼ desde cualquier elemento de la barra; sin él, el más cercano debajo. */
+    downFocus: FocusRequester? = null,
+) {
     val graph = LocalGraph.current
     val settings by graph.settings.settings.collectAsState()
     val c = Lumen.colors
     Row(
-        modifier.fillMaxWidth(),
+        modifier.fillMaxWidth().then(if (downFocus != null) Modifier.focusProperties { down = downFocus } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -58,6 +70,7 @@ fun TopBar(nav: Navigator, currentRoute: String, modifier: Modifier = Modifier, 
                         val selected = route == currentRoute
                         FocusSurface(
                             onClick = { if (!selected) nav.replaceRoot(route) },
+                            modifier = if (selected && currentTabFocus != null) Modifier.focusRequester(currentTabFocus) else Modifier,
                             radius = 50.dp,
                             containerColor = if (selected) c.surfaceFocused else Color.Transparent,
                             focusedContainerColor = Color.White,

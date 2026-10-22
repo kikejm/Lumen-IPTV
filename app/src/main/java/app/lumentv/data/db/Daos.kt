@@ -193,6 +193,9 @@ interface LibraryDao {
 
     @Query("DELETE FROM history WHERE playlistId = :pid")
     suspend fun clearHistory(pid: Long)
+
+    @Query("DELETE FROM history WHERE playlistId = :pid AND kind = :kind AND itemId = :itemId")
+    suspend fun removeHistory(pid: Long, kind: ContentKind, itemId: String)
 }
 
 @Dao
