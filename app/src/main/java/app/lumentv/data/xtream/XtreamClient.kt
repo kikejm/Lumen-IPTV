@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -34,7 +35,24 @@ data class XtreamCredentials(val server: String, val username: String, val passw
             if (!s.startsWith("http://", true) && !s.startsWith("https://", true)) s = "http://$s"
             // Algunos proveedores dan la URL completa del panel.
             s = s.removeSuffix("/player_api.php").removeSuffix("/get.php")
+            // El puerto 80 nunca es TLS: «https://host:80» falla con WRONG_VERSION_NUMBER.
+            if (s.startsWith("https://", true) && Regex(":80(/|$)").containsMatchIn(s.substringAfter("://"))) s = "http://" + s.substringAfter("://")
             return s
+        }
+
+        /**
+         * Un enlace M3U `…/get.php?username=…&password=…` es en realidad un panel Xtream Codes.
+         * Devuelve sus credenciales para darlo de alta como Xtream (fichas, series y EPG), o null si
+         * no lo es.
+         */
+        fun fromM3uUrl(url: String): XtreamCredentials? {
+            val u = url.trim().toHttpUrlOrNull() ?: return null
+            if (!u.encodedPath.endsWith("/get.php")) return null
+            val user = u.queryParameter("username")?.takeIf { it.isNotBlank() } ?: return null
+            val pass = u.queryParameter("password")?.takeIf { it.isNotBlank() } ?: return null
+            val scheme = if (u.isHttps && u.port == 80) "http" else u.scheme
+            val port = if (u.port == HttpUrl.defaultPort(scheme)) "" else ":${u.port}"
+            return XtreamCredentials("$scheme://${u.host}$port${u.encodedPath.removeSuffix("/get.php")}", user, pass)
         }
     }
 }

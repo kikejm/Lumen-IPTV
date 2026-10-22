@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.runtime.Composable
@@ -71,7 +73,8 @@ fun RemoteSetupScreen(nav: Navigator) {
                 if (qr != null) Image(qr, contentDescription = "Código QR", modifier = Modifier.size(260.dp))
                 else Box(Modifier.size(260.dp), contentAlignment = Alignment.Center) { LText("Iniciando…", color = Color.Black) }
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Desplazable: si el aviso es largo, el botón no debe encogerse (se veía como una píldora vacía).
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 LText("Escanea el código con el móvil", style = Lumen.type.largeTitle)
                 LText("El móvil tiene que estar en la misma Wi‑Fi que el Fire TV. Desde esa página puedes:", style = Lumen.type.body, color = c.textSecondary)
                 LText("•  Subir los ficheros .conf de Proton VPN (uno por servidor).", style = Lumen.type.body)
@@ -81,7 +84,7 @@ fun RemoteSetupScreen(nav: Navigator) {
                 LText(info?.url ?: "…", style = Lumen.type.title, color = c.accent)
                 event?.let {
                     Gap(height = 8.dp)
-                    LText(it, style = Lumen.type.headline, color = if (it.startsWith("Error")) c.danger else c.success)
+                    LText(it, style = Lumen.type.headline, color = if (it.startsWith("Error")) c.danger else c.success, maxLines = 3)
                 }
                 Gap(height = 12.dp)
                 PillButton("Hecho", onClick = { nav.back() }, icon = Icons.AutoMirrored.Rounded.ArrowBack, primary = true, modifier = Modifier.focusRequester(back))

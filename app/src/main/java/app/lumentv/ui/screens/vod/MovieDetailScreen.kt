@@ -1,6 +1,7 @@
 package app.lumentv.ui.screens.vod
 
 import android.content.Intent
+import android.util.Log
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -75,14 +76,16 @@ fun MovieDetailScreen(nav: Navigator, movieId: String) {
         history = graph.library.historyItem(p.id, ContentKind.VOD, movieId)
         isFav = graph.library.isFavorite(p.id, ContentKind.VOD, movieId)
         runCatching { playFocus.requestFocus() }
-        if (p.type == PlaylistType.XTREAM) info = runCatching { graph.xtream.vodInfo(graph.playlists.credentials(p), movieId) }.getOrNull()
+        if (p.type == PlaylistType.XTREAM) info = runCatching { graph.xtream.vodInfo(graph.playlists.credentials(p), movieId) }
+            .onFailure { Log.w("MovieDetail", "get_vod_info falló: ${it.javaClass.simpleName}: ${it.message?.take(300)}") }
+            .getOrNull()
     }
 
     val m = movie
     Box(Modifier.fillMaxSize().background(c.background)) {
         val backdrop = info?.backdrop?.ifBlank { null } ?: info?.poster ?: m?.poster.orEmpty()
         if (backdrop.isNotBlank()) {
-            AsyncImage(model = backdrop, contentDescription = null, contentScale = ContentScale.Crop, alpha = if (c.isDark) 0.45f else 0.25f, modifier = Modifier.fillMaxSize())
+            AsyncImage(model = backdrop, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.45f, modifier = Modifier.fillMaxSize())
             Box(Modifier.matchParentSize().background(Brush.horizontalGradient(listOf(c.background, c.background.copy(alpha = 0.6f), Color.Transparent))))
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, c.background), startY = 400f)))
         }

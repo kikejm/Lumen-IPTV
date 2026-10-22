@@ -61,6 +61,8 @@ Fuera del código:
 - **Descargar y parsear son pasos separados.** Las respuestas grandes se vuelcan a un temporal en `cacheDir` (`core/net/withDownloadedFile`) y se parsean desde disco: así la conexión HTTP dura lo mínimo y no depende de la velocidad de Room.
 - **"Conectado" significa handshake.** La UI de la VPN solo muestra verde tras el primer handshake WireGuard; antes es "Negociando…" y a los 15 s "El servidor no responde".
 - **Los secretos nunca salen en claro del dispositivo ni a logs.** Contraseñas y `.conf` se guardan con `SecretBox`. Las URLs de stream contienen credenciales: no se loguean ni se muestran.
+- **Una sola conexión de vídeo por cuenta.** Muchas cuentas IPTV solo admiten una: antes de `prepare()`, la previsualización y el reproductor llaman a `PlayerFactory.claimStream`, que para los demás reproductores. Multipantalla crea los suyos con `exclusive = false`.
+- **Un enlace M3U `get.php?username=…&password=…` se guarda como Xtream** (`XtreamCredentials.fromM3uUrl`): así hay fichas, series y EPG. Al arrancar se convierten también las listas ya guardadas así.
 - **Un solo túnel VPN** (`lumen`) y una sola instancia de `GoBackend`. Conectar a otro servidor reemplaza el túnel; no hay túneles paralelos.
 - **El ámbito "Solo Lumen" se aplica en la configuración WireGuard** (`IncludedApplications`), no con proxies ni rutas propias. Por eso el resto del Fire TV no se ve afectado.
 - **No hay login contra Proton.** Lumen no conoce la cuenta del usuario; solo tiene los `.conf`. Esto es intencionado: la API de Proton exige SRP + captcha y no es pública.

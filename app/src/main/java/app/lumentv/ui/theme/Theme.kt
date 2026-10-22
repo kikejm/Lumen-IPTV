@@ -1,6 +1,5 @@
 package app.lumentv.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -16,17 +15,14 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.darkColorScheme
-import androidx.tv.material3.lightColorScheme
 import app.lumentv.R
-import app.lumentv.data.settings.ThemeMode
 
 /**
  * Tokens de color de Lumen (ver DESIGN.md). Inspirados en los colores de sistema de Apple:
- * fondo negro puro / gris sistema, superficies "glass" y un único acento azul.
+ * fondo negro puro, superficies "glass" y un único acento azul. Solo hay tema oscuro.
  */
 @Immutable
 data class LumenColors(
-    val isDark: Boolean,
     val background: Color,
     val surface: Color,
     val surfaceElevated: Color,
@@ -45,7 +41,6 @@ data class LumenColors(
 )
 
 val DarkLumenColors = LumenColors(
-    isDark = true,
     background = Color(0xFF000000),
     surface = Color(0xFF1C1C1E),
     surfaceElevated = Color(0xFF2C2C2E),
@@ -61,25 +56,6 @@ val DarkLumenColors = LumenColors(
     hairline = Color(0x14FFFFFF),
     focusRing = Color(0xFFFFFFFF),
     scrim = Color(0xCC000000),
-)
-
-val LightLumenColors = LumenColors(
-    isDark = false,
-    background = Color(0xFFF2F2F7),
-    surface = Color(0xFFFFFFFF),
-    surfaceElevated = Color(0xFFE5E5EA),
-    surfaceFocused = Color(0xFFFFFFFF),
-    textPrimary = Color(0xFF000000),
-    textSecondary = Color(0x993C3C43),
-    textTertiary = Color(0x4D3C3C43),
-    accent = Color(0xFF007AFF),
-    onAccent = Color(0xFFFFFFFF),
-    success = Color(0xFF34C759),
-    warning = Color(0xFFFF9500),
-    danger = Color(0xFFFF3B30),
-    hairline = Color(0x14000000),
-    focusRing = Color(0xFF007AFF),
-    scrim = Color(0xB3F2F2F7),
 )
 
 /** Alan Sans (Google Fonts, OFL) en dos pesos fijos: 800 para títulos y 400 para el resto. */
@@ -117,30 +93,15 @@ object Lumen {
 }
 
 @Composable
-fun LumenTheme(mode: ThemeMode, content: @Composable () -> Unit) {
-    val dark = when (mode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
-    val colors = if (dark) DarkLumenColors else LightLumenColors
-    val scheme = if (dark) {
-        darkColorScheme(
-            primary = colors.accent, onPrimary = colors.onAccent,
-            background = colors.background, onBackground = colors.textPrimary,
-            surface = colors.surface, onSurface = colors.textPrimary,
-            surfaceVariant = colors.surfaceElevated, onSurfaceVariant = colors.textSecondary,
-            border = colors.focusRing, error = colors.danger,
-        )
-    } else {
-        lightColorScheme(
-            primary = colors.accent, onPrimary = colors.onAccent,
-            background = colors.background, onBackground = colors.textPrimary,
-            surface = colors.surface, onSurface = colors.textPrimary,
-            surfaceVariant = colors.surfaceElevated, onSurfaceVariant = colors.textSecondary,
-            border = colors.focusRing, error = colors.danger,
-        )
-    }
+fun LumenTheme(content: @Composable () -> Unit) {
+    val colors = DarkLumenColors
+    val scheme = darkColorScheme(
+        primary = colors.accent, onPrimary = colors.onAccent,
+        background = colors.background, onBackground = colors.textPrimary,
+        surface = colors.surface, onSurface = colors.textPrimary,
+        surfaceVariant = colors.surfaceElevated, onSurfaceVariant = colors.textSecondary,
+        border = colors.focusRing, error = colors.danger,
+    )
     CompositionLocalProvider(LocalLumenColors provides colors, LocalLumenType provides LumenType()) {
         MaterialTheme(colorScheme = scheme) {
             // Fuera de una Surface el color de contenido por defecto sería negro: lo fijamos al primario.

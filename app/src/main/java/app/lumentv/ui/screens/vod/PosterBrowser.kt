@@ -91,7 +91,7 @@ fun PosterBrowser(
                     model = art,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    alpha = if (c.isDark) 0.35f else 0.18f,
+                    alpha = 0.35f,
                     modifier = Modifier.fillMaxWidth().fillMaxHeight(0.6f).align(Alignment.TopEnd),
                 )
                 Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, c.background), startY = 150f, endY = 700f)))

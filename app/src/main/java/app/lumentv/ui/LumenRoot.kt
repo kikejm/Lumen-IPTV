@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -61,9 +60,8 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun LumenRoot(graph: AppGraph) {
-    val settings by graph.settings.settings.collectAsState()
     CompositionLocalProvider(LocalGraph provides graph) {
-        LumenTheme(settings.themeMode) {
+        LumenTheme {
             // ¿Hay alguna lista? Si no, empezamos en el alta de lista (onboarding).
             val hasPlaylist by produceState<Boolean?>(null) { value = graph.playlists.activeNow() != null }
             Box(Modifier.fillMaxSize().background(Lumen.colors.background)) {

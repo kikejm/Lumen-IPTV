@@ -53,7 +53,6 @@ import app.lumentv.data.epg.EpgSyncState
 import app.lumentv.data.settings.AppSettings
 import app.lumentv.data.settings.LiveFormat
 import app.lumentv.data.settings.ResizeMode
-import app.lumentv.data.settings.ThemeMode
 import app.lumentv.tools.SpeedResult
 import app.lumentv.ui.components.ConfirmDialog
 import app.lumentv.ui.components.FocusSurface
@@ -223,10 +222,6 @@ private fun AppearanceSection() {
     val scope = rememberCoroutineScope()
     val s = rememberSettings()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SettingRow("Tema", s.themeMode.label, "Claro, oscuro o el del sistema") {
-            val next = ThemeMode.entries[(s.themeMode.ordinal + 1) % ThemeMode.entries.size]
-            scope.launch { graph.settings.setThemeMode(next) }
-        }
         SettingRow("Formato de hora", if (s.use24h) "24 horas" else "12 horas (AM/PM)") { scope.launch { graph.settings.setUse24h(!s.use24h) } }
     }
 }

@@ -40,6 +40,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -67,6 +68,8 @@ import app.lumentv.data.catalog.QualityFilter
 import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.PlaylistEntity
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import app.lumentv.player.PlayerFactory
 import app.lumentv.ui.components.Artwork
 import app.lumentv.ui.components.CategoryColumn
@@ -75,6 +78,7 @@ import app.lumentv.ui.components.FocusSurface
 import app.lumentv.ui.components.Gap
 import app.lumentv.ui.components.KeyHints
 import app.lumentv.ui.components.LText
+import app.lumentv.ui.components.LoadingSpinner
 import app.lumentv.ui.components.MenuOption
 import app.lumentv.ui.components.OptionsDialog
 import app.lumentv.ui.components.PinDialog
@@ -128,10 +132,30 @@ fun LiveScreen(nav: Navigator) {
 
     // Reproductor de previsualización: vive mientras la pantalla está abierta.
     val player = remember { graph.players.create(lightweight = true) }
-    DisposableEffect(Unit) { onDispose { player.release() } }
-    LaunchedEffect(preview, playlist) {
+    var previewState by remember { mutableIntStateOf(Player.STATE_IDLE) }
+    var previewFailed by remember { mutableStateOf(false) }
+    var previewRetry by remember { mutableIntStateOf(0) }
+    DisposableEffect(Unit) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) { previewState = state }
+            override fun onPlayerError(error: PlaybackException) {
+                // Un rechazo justo al volver del reproductor suele ser la conexión anterior aún abierta: un reintento.
+                if (previewRetry < 1) previewRetry++ else previewFailed = true
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    LaunchedEffect(preview) { previewRetry = 0 }
+    LaunchedEffect(preview, playlist, previewRetry) {
         val p = playlist ?: return@LaunchedEffect
         val ch = preview ?: return@LaunchedEffect
+        if (previewRetry > 0) delay(2_000)
+        previewFailed = false
+        graph.players.claimStream(player)
         player.setMediaItem(PlayerFactory.mediaItem(graph.streams.live(p, ch).url))
         player.prepare()
         player.playWhenReady = true
@@ -278,6 +302,11 @@ fun LiveScreen(nav: Navigator) {
             Column(Modifier.weight(previewWeight).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
                     if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
+                    when {
+                        preview == null -> Unit
+                        previewFailed -> LText("No disponible", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
+                        previewState != Player.STATE_READY -> LoadingSpinner(Modifier.align(Alignment.Center))
+                    }
                 }
                 focused?.let { ch ->
                     LText(ch.name, style = Lumen.type.headline, maxLines = 1)

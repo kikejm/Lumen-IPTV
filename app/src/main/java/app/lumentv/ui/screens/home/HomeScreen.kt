@@ -213,12 +213,12 @@ private fun ContinueCard(h: HistoryEntity, use24h: Boolean, onResume: () -> Unit
                 }
             }
             Row(
-                Modifier.clip(RoundedCornerShape(50)).background(if (c.isDark) Color.White else c.accent).padding(horizontal = 20.dp, vertical = 10.dp),
+                Modifier.clip(RoundedCornerShape(50)).background(Color.White).padding(horizontal = 20.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = if (c.isDark) Color.Black else Color.White)
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.Black)
                 Gap(width = 6.dp)
-                LText("Reanudar", style = Lumen.type.callout, color = if (c.isDark) Color.Black else Color.White)
+                LText("Reanudar", style = Lumen.type.callout, color = Color.Black)
             }
         }
     }

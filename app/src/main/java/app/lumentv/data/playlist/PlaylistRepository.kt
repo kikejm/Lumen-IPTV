@@ -64,6 +64,12 @@ class PlaylistRepository(
 
     suspend fun saveM3u(name: String, url: String, epgUrl: String, existingId: Long? = null): Long {
         require(url.startsWith("http", ignoreCase = true)) { "La URL M3U debe empezar por http(s)://" }
+        // Un get.php de Xtream da mucho más como Xtream (fichas, series, EPG): se guarda así.
+        XtreamCredentials.fromM3uUrl(url)?.let { c ->
+            val id = saveXtream(name, c.server, c.username, c.password, existingId)
+            if (epgUrl.isNotBlank()) db.playlists().byId(id)?.let { setEpgUrl(it, epgUrl) }
+            return id
+        }
         val base = existingId?.let { db.playlists().byId(it) }
         val entity = PlaylistEntity(
             id = base?.id ?: 0,
@@ -74,6 +80,22 @@ class PlaylistRepository(
             createdAt = base?.createdAt ?: System.currentTimeMillis(),
         )
         return persist(entity, base != null)
+    }
+
+    /**
+     * Convierte en Xtream las listas M3U guardadas con un enlace get.php (ver [saveM3u]) sin cambiar
+     * la lista activa. Devuelve los ids convertidos, que necesitan sincronizarse de nuevo.
+     */
+    suspend fun upgradeXtreamM3uLists(): List<Long> {
+        val m3u = db.playlists().all().filter { it.type == PlaylistType.M3U }
+        val candidates = m3u.mapNotNull { p -> XtreamCredentials.fromM3uUrl(p.m3uUrl)?.let { p to it } }
+        if (candidates.isEmpty()) return emptyList()
+        val active = settings.load().activePlaylistId
+        val upgraded = candidates.mapNotNull { (p, c) ->
+            runCatching { saveXtream(p.name, c.server, c.username, c.password, existingId = p.id) }.getOrNull()
+        }
+        settings.setActivePlaylist(active)
+        return upgraded
     }
 
     /** Refresca estado de la cuenta (caducidad, conexiones) sin tocar el catálogo. */

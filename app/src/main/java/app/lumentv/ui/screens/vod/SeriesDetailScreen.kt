@@ -1,5 +1,6 @@
 package app.lumentv.ui.screens.vod
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,6 +81,7 @@ fun SeriesDetailScreen(nav: Navigator, seriesId: String) {
         isFav = graph.library.isFavorite(p.id, ContentKind.SERIES, seriesId)
         if (p.type != PlaylistType.XTREAM) return@LaunchedEffect
         runCatching { graph.xtream.seriesInfo(graph.playlists.credentials(p), seriesId) }
+            .onFailure { Log.w("SeriesDetail", "get_series_info falló: ${it.javaClass.simpleName}: ${it.message?.take(300)}") }
             .onSuccess { si ->
                 info = si
                 // Última temporada vista (o la primera).
@@ -104,7 +106,7 @@ fun SeriesDetailScreen(nav: Navigator, seriesId: String) {
     Box(Modifier.fillMaxSize().background(c.background)) {
         val backdrop = info?.backdrop?.ifBlank { null } ?: series?.backdrop?.ifBlank { null } ?: series?.cover.orEmpty()
         if (backdrop.isNotBlank()) {
-            AsyncImage(model = backdrop, contentDescription = null, contentScale = ContentScale.Crop, alpha = if (c.isDark) 0.35f else 0.2f, modifier = Modifier.fillMaxSize())
+            AsyncImage(model = backdrop, contentDescription = null, contentScale = ContentScale.Crop, alpha = 0.35f, modifier = Modifier.fillMaxSize())
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, c.background), startY = 200f, endY = 800f)))
         }
         Column(Modifier.fillMaxSize().padding(horizontal = LumenDimens.safeHorizontal, vertical = LumenDimens.safeVertical)) {

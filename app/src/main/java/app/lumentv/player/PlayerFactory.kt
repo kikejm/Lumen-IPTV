@@ -15,12 +15,21 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.lumentv.data.settings.SettingsRepository
 import okhttp3.OkHttpClient
+import java.util.Collections
+import java.util.WeakHashMap
 
 /** Crea instancias de ExoPlayer configuradas según los ajustes del reproductor. */
 @OptIn(UnstableApi::class)
 class PlayerFactory(private val context: Context, private val http: OkHttpClient, private val settings: SettingsRepository) {
 
-    fun create(lightweight: Boolean = false): ExoPlayer {
+    /** Reproductores que comparten la única conexión de la cuenta (todos menos los de multipantalla). */
+    private val exclusivePlayers: MutableSet<ExoPlayer> = Collections.newSetFromMap(WeakHashMap())
+
+    /**
+     * `exclusive`: antes de abrir un stream con [claimStream], los demás reproductores exclusivos se
+     * paran. Multipantalla pasa `false` porque ahí se quieren varias señales a la vez.
+     */
+    fun create(lightweight: Boolean = false, exclusive: Boolean = true): ExoPlayer {
         val s = settings.current
         val httpFactory = OkHttpDataSource.Factory(http).setUserAgent(s.userAgent)
         val dataSourceFactory = DefaultDataSource.Factory(context, httpFactory)
@@ -42,6 +51,16 @@ class PlayerFactory(private val context: Context, private val http: OkHttpClient
             .setHandleAudioBecomingNoisy(true)
             .build()
             .apply { videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT }
+            .also { if (exclusive) synchronized(exclusivePlayers) { exclusivePlayers += it } }
+    }
+
+    /**
+     * Muchas cuentas IPTV solo admiten una conexión: si la previsualización sigue abierta al entrar
+     * a pantalla completa (o al revés), el proveedor responde 403/426. Llamar antes de `prepare()`.
+     */
+    fun claimStream(owner: ExoPlayer) {
+        val others = synchronized(exclusivePlayers) { exclusivePlayers.filter { it !== owner } }
+        others.forEach { runCatching { it.stop() } }
     }
 
     companion object {

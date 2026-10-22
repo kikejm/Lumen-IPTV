@@ -130,8 +130,8 @@ fun PillButton(
     enabled: Boolean = true,
 ) {
     val c = Lumen.colors
-    val base = if (primary) (if (c.isDark) Color.White else c.accent) else c.surfaceElevated
-    val fg = if (primary) (if (c.isDark) Color.Black else Color.White) else c.textPrimary
+    val base = if (primary) Color.White else c.surfaceElevated
+    val fg = if (primary) Color.Black else c.textPrimary
     FocusSurface(
         onClick = { if (enabled) onClick() },
         modifier = modifier,
@@ -214,13 +214,18 @@ fun Artwork(
     background: Color = Lumen.colors.surfaceElevated,
 ) {
     Box(modifier.clip(RoundedCornerShape(radius)).background(background), contentAlignment = Alignment.Center) {
-        val initials = fallback.split(' ', ':').filter { it.isNotBlank() }.take(2).joinToString("") { it.take(1) }.uppercase()
-        LText(initials, style = Lumen.type.headline, color = Lumen.colors.textSecondary)
+        // Las iniciales solo sustituyen al logo: si hay imagen, no deben verse detrás de ella.
+        var failed by remember(url) { mutableStateOf(url.isBlank()) }
+        if (failed) {
+            val initials = fallback.split(' ', ':').filter { it.isNotBlank() }.take(2).joinToString("") { it.take(1) }.uppercase()
+            LText(initials, style = Lumen.type.headline, color = Lumen.colors.textSecondary)
+        }
         if (url.isNotBlank()) {
             AsyncImage(
                 model = url,
                 contentDescription = fallback,
                 contentScale = contentScale,
+                onError = { failed = true },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -375,7 +380,7 @@ fun GlassPanel(modifier: Modifier = Modifier, radius: Dp = LumenDimens.radiusLar
     Box(
         modifier
             .clip(RoundedCornerShape(radius))
-            .background(c.surface.copy(alpha = if (c.isDark) 0.82f else 0.92f))
+            .background(c.surface.copy(alpha = 0.82f))
             .border(1.dp, c.hairline, RoundedCornerShape(radius)),
         content = content,
     )

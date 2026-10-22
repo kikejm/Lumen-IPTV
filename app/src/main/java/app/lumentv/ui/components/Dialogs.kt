@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -45,8 +46,14 @@ fun OptionsDialog(title: String, options: List<MenuOption>, onDismiss: () -> Uni
         GlassPanel(Modifier.width(420.dp)) {
             Column(Modifier.padding(20.dp)) {
                 LText(title, style = Lumen.type.headline, color = Lumen.colors.textPrimary)
-                Gap(height = 12.dp)
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                Gap(height = 6.dp)
+                // Margen interior: la lista recorta a sus bordes y el elemento enfocado crece y lleva
+                // anillo + halo; sin margen se veían cortados arriba y abajo.
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp, horizontal = 6.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     items(options.size) { i ->
                         val o = options[i]
                         FocusSurface(

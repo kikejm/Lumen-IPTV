@@ -1,9 +1,9 @@
 ---
 version: alpha
 name: Lumen TV
-description: Interfaz 10-foot para Fire TV inspirada en Apple tvOS. Minimalista, contenido primero, foco como protagonista. Modo oscuro (por defecto) y claro.
+description: Interfaz 10-foot para Fire TV inspirada en Apple tvOS. Minimalista, contenido primero, foco como protagonista. Solo modo oscuro.
 colors:
-  # Modo oscuro (por defecto)
+  # Tema oscuro (único)
   background: "#000000"
   surface: "#1C1C1E"
   surface-elevated: "#2C2C2E"
@@ -18,16 +18,6 @@ colors:
   danger: "#FF453A"
   hairline: "rgba(255, 255, 255, 0.08)"
   focus-ring: "#FFFFFF"
-  # Modo claro
-  light-background: "#F2F2F7"
-  light-surface: "#FFFFFF"
-  light-text-primary: "#000000"
-  light-text-secondary: "rgba(60, 60, 67, 0.6)"
-  light-accent: "#007AFF"
-  light-success: "#34C759"
-  light-warning: "#FF9500"
-  light-danger: "#FF3B30"
-  light-focus-ring: "#007AFF"
   # Tintes de los accesos de Inicio
   tile-live: "#0A84FF"
   tile-movies: "#FF375F"
@@ -129,8 +119,8 @@ Lumen es una app de TV que se usa **a 3 metros y solo con el mando del Fire TV**
 
 ## Colors
 
-- `background` negro puro en oscuro (OLED y menos halo en paneles LED); gris sistema `#F2F2F7` en claro.
-- Superficies en tres niveles: `surface` (tarjetas en reposo), `surface-elevated` (seleccionado sin foco, campos), `surface-focused` (foco). En claro, las tres son blancas y la jerarquía la marca la sombra/escala.
+- `background` negro puro (OLED y menos halo en paneles LED). **No hay tema claro**: se eliminó porque no funcionaba bien en la tele.
+- Superficies en tres niveles: `surface` (tarjetas en reposo), `surface-elevated` (seleccionado sin foco, campos), `surface-focused` (foco).
 - Texto en tres opacidades (primario 100 %, secundario 60 %, terciario 30 %), nunca grises inventados.
 - Los tintes `tile-*` solo se usan como fondo al 18 % del icono de cada acceso de Inicio.
 - Sobre vídeo (reproductor, multipantalla) se usa blanco/negro con degradados, independientemente del tema.
@@ -163,11 +153,13 @@ Esquinas continuas: 10 dp (filas, chips grandes), 14 dp (tarjetas, previsualizac
 ## Components
 
 - `FocusSurface` — base de todo lo navegable (envuelve `androidx.tv.material3.Surface`). Parámetros: radio, colores reposo/foco, escala, anillo.
-- `PillButton` — primario (blanco con texto negro en oscuro; acento en claro) y secundario (`surface-elevated`).
+- `PillButton` — primario (blanco con texto negro) y secundario (`surface-elevated`).
 - `CategoryColumn` — lista vertical; la categoría activa va en acento, con contador y candado si está bloqueada.
 - `VpnPill` — punto de estado + texto; abre la pantalla VPN.
 - `Chip` — etiqueta en mayúsculas sobre color al 16 % (o sólido, como «Mi lista»). No se marca «EN DIRECTO» sobre el vídeo: ni en la previsualización, ni en el reproductor, ni en Inicio.
 - `ProgressLine` — barra de 3 dp, pista al 35 % del terciario.
+- `LoadingSpinner` — anillo blanco que gira (pista al 20 %); solo él en la previsualización mientras carga. `PlayerLoading` — en pantalla completa, «Cargando» con los puntos apareciendo en bucle dentro de un anillo de 150 dp.
+- `Artwork` — logo/póster; las iniciales del nombre solo aparecen si no hay imagen o falla al cargar.
 - `GlassPanel`, `OptionsDialog` (menú ☰), `PinDialog` (teclado numérico navegable), `ConfirmDialog`, `TvTextField`.
 
 ## Do's and Don'ts

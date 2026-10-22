@@ -50,6 +50,8 @@ class ImportServer(private val scope: CoroutineScope, private val json: Json) {
 
     fun start(handler: ImportHandler) {
         if (job?.isActive == true) return
+        // Cada apertura de la pantalla empieza limpia: el aviso de la vez anterior ya no aplica.
+        _lastEvent.value = null
         val token = (100000 + SecureRandom().nextInt(900000)).toString()
         val ip = localIpv4() ?: "0.0.0.0"
         job = scope.launch(Dispatchers.IO) {

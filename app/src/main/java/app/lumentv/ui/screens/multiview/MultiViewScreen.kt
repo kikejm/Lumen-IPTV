@@ -118,7 +118,7 @@ private fun MultiViewGrid(layout: MultiLayout) {
     val graph = LocalGraph.current
     val playlist by graph.playlists.active.collectAsState(initial = null)
     val channels = remember { mutableStateListOf<ChannelEntity?>().apply { repeat(layout.slots) { add(null) } } }
-    val players = remember { List(layout.slots) { graph.players.create(lightweight = true) } }
+    val players = remember { List(layout.slots) { graph.players.create(lightweight = true, exclusive = false) } }
     var focusedSlot by remember { mutableIntStateOf(0) }
     var pickerFor by remember { mutableStateOf<Int?>(null) }
 

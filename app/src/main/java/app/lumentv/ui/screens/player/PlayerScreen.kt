@@ -1,6 +1,7 @@
 package app.lumentv.ui.screens.player
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -56,6 +57,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.HttpDataSource
 import androidx.tv.material3.Icon
 import app.lumentv.MainActivity
 import app.lumentv.core.util.TimeFormatter
@@ -71,6 +74,7 @@ import app.lumentv.ui.components.Gap
 import app.lumentv.ui.components.LText
 import app.lumentv.ui.components.MenuOption
 import app.lumentv.ui.components.OptionsDialog
+import app.lumentv.ui.components.PlayerLoading
 import app.lumentv.ui.components.PillButton
 import app.lumentv.ui.components.ProgressLine
 import app.lumentv.ui.components.VideoSurface
@@ -138,6 +142,7 @@ fun PlayerScreen(nav: Navigator) {
         target ?: return
         item = target
         error = null
+        graph.players.claimStream(player)
         player.setMediaItem(PlayerFactory.mediaItem(target.url), target.startPositionMs)
         player.prepare()
         player.playWhenReady = true
@@ -166,10 +171,11 @@ fun PlayerScreen(nav: Navigator) {
             }
             override fun onPlayerError(e: PlaybackException) {
                 val current = item
-                // En directo los cortes son habituales: reintenta un par de veces antes de mostrar el error.
-                if (current?.kind == ContentKind.LIVE && retries < 2) {
+                // En directo los cortes son habituales, y un 403/426 suele ser la conexión anterior que el
+                // proveedor aún no ha soltado: reintenta un par de veces antes de mostrar el error.
+                if (current != null && retries < 2 && (current.kind == ContentKind.LIVE || e.isConnectionRefused())) {
                     retries++
-                    scope.launch { delay(1500); load(current) }
+                    scope.launch { delay(2_000); load(current) }
                 } else {
                     error = humanError(e)
                 }
@@ -240,9 +246,7 @@ fun PlayerScreen(nav: Navigator) {
     ) {
         VideoSurface(player, Modifier.fillMaxSize(), resize)
 
-        if (buffering && error == null) {
-            LText("Cargando…", style = Lumen.type.headline, color = Color.White, modifier = Modifier.align(Alignment.Center))
-        }
+        if (buffering && error == null) PlayerLoading(Modifier.align(Alignment.Center))
 
         error?.let { msg ->
             Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -378,10 +382,19 @@ private fun optionsFor(tracks: Tracks, type: Int): List<TrackOption> = buildList
 }
 
 private fun humanError(e: PlaybackException): String = when (e.errorCode) {
-    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "El servidor rechazó la conexión (¿límite de conexiones o canal caído?)"
+    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> when (val code = e.httpCode()) {
+        403, 426, 458, 509 -> "El proveedor rechazó la conexión (HTTP $code). Suele pasar si tu cuenta ya se está usando en otro dispositivo."
+        null -> "El servidor rechazó la conexión."
+        else -> "El servidor rechazó la conexión (HTTP $code). Puede que el canal esté caído."
+    }
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Sin conexión con el servidor. Comprueba la red o la VPN."
     PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "Formato no soportado. Prueba otro formato en Ajustes o un reproductor externo."
     else -> e.errorCodeName
 }
+
+@OptIn(UnstableApi::class)
+private fun PlaybackException.httpCode(): Int? = (cause as? HttpDataSource.InvalidResponseCodeException)?.responseCode
+
+private fun PlaybackException.isConnectionRefused(): Boolean = httpCode() in setOf(403, 426, 458, 509)

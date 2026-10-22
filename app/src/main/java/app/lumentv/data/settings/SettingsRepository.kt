@@ -19,12 +19,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
-enum class ThemeMode(val label: String) { SYSTEM("Sistema"), LIGHT("Claro"), DARK("Oscuro") }
 enum class ResizeMode(val label: String) { FIT("Ajustar"), FILL("Estirar"), ZOOM("Zoom") }
 enum class LiveFormat(val ext: String, val label: String) { TS("ts", "MPEG-TS (.ts)"), HLS("m3u8", "HLS (.m3u8)") }
 
 data class AppSettings(
-    val themeMode: ThemeMode = ThemeMode.DARK,
     val use24h: Boolean = true,
     val epgOffsetHours: Int = 0,
     val liveFormat: LiveFormat = LiveFormat.TS,
@@ -73,7 +71,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         store.edit { block(it) }
     }
 
-    suspend fun setThemeMode(v: ThemeMode) = update { it[K.theme] = v.name }
     suspend fun setUse24h(v: Boolean) = update { it[K.use24h] = v }
     suspend fun setEpgOffset(v: Int) = update { it[K.epgOffset] = v }
     suspend fun setLiveFormat(v: LiveFormat) = update { it[K.liveFormat] = v.name }
@@ -96,7 +93,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setLiveQuality(v: QualityFilter) = update { it[K.liveQuality] = v.name }
 
     private fun Preferences.toSettings() = AppSettings(
-        themeMode = enumOr(this[K.theme], ThemeMode.DARK),
         use24h = this[K.use24h] ?: true,
         epgOffsetHours = this[K.epgOffset] ?: 0,
         liveFormat = enumOr(this[K.liveFormat], LiveFormat.TS),
@@ -123,7 +119,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         name?.let { n -> enumValues<E>().firstOrNull { it.name == n } } ?: default
 
     private object K {
-        val theme = stringPreferencesKey("theme")
         val use24h = booleanPreferencesKey("use24h")
         val epgOffset = intPreferencesKey("epg_offset")
         val liveFormat = stringPreferencesKey("live_format")

@@ -3,8 +3,10 @@ package app.lumentv.di
 import android.app.Application
 import android.util.Log
 import app.lumentv.core.crypto.SecretBox
+import app.lumentv.core.util.countryName
 import app.lumentv.data.catalog.CatalogRepository
 import app.lumentv.data.db.LumenDatabase
+import app.lumentv.data.db.PlaylistType
 import app.lumentv.data.epg.EpgRepository
 import app.lumentv.data.library.LibraryRepository
 import app.lumentv.data.playlist.PlaylistRepository
@@ -19,6 +21,7 @@ import app.lumentv.remote.ImportServer
 import app.lumentv.tools.SpeedTest
 import app.lumentv.update.UpdateInfo
 import app.lumentv.update.UpdateManager
+import app.lumentv.vpn.ProtonConfigParser
 import app.lumentv.vpn.VpnManager
 import app.lumentv.vpn.VpnServerRepository
 import kotlinx.coroutines.CoroutineScope
@@ -92,11 +95,19 @@ class AppGraph(val app: Application) {
     val importHandler = object : ImportHandler {
         override suspend fun onVpnConfigs(files: List<Pair<String?, String>>): String {
             val result = vpnServers.importMany(files.flatMap { (n, t) -> VpnServerRepository.splitBundle(n, t) }, "phone")
+            // Resumen corto: con 20 servidores, la lista nombre a nombre no cabe en la tele.
             return buildString {
-                if (result.imported.isNotEmpty()) append("Importados: ${result.imported.joinToString()}")
+                val n = result.imported.size
+                if (n > 0) {
+                    val countries = result.imported.map { countryName(ProtonConfigParser.countryOf(it)) }.distinct()
+                    append(if (n == 1) "1 servidor importado" else "$n servidores importados")
+                    append(if (countries.size == 1) " de ${countries[0]}" else " de ${countries.size} países: ${countries.joinToString()}")
+                }
                 if (result.errors.isNotEmpty()) {
                     if (isNotEmpty()) append(" · ")
-                    append("Errores: ${result.errors.joinToString()}")
+                    val shown = result.errors.take(2).joinToString()
+                    append("${result.errors.size} con error: $shown")
+                    if (result.errors.size > 2) append("…")
                 }
                 if (result.imported.isEmpty() && result.errors.isNotEmpty()) throw IllegalArgumentException(toString())
             }
@@ -111,7 +122,11 @@ class AppGraph(val app: Application) {
         override suspend fun onM3u(name: String, url: String, epgUrl: String): String {
             val id = playlists.saveM3u(name, url, epgUrl)
             appScope.launch { syncPlaylist(id) }
-            return "Lista M3U guardada. Cargando canales en la tele…"
+            return if (playlists.byId(id)?.type == PlaylistType.XTREAM) {
+                "Es un enlace de Xtream Codes: guardada como Xtream (con fichas, series y guía). Cargando canales en la tele…"
+            } else {
+                "Lista M3U guardada. Cargando canales en la tele…"
+            }
         }
     }
 
@@ -120,8 +135,11 @@ class AppGraph(val app: Application) {
             runCatching { vpnServers.importBundled() }.onFailure { Log.w(TAG, "Configs VPN empaquetadas", it) }
             db.programs().runCatching { deleteOlderThan(System.currentTimeMillis() - 2 * 24 * 3_600_000L) }
             val s = settings.load()
+            val upgraded = runCatching { playlists.upgradeXtreamM3uLists() }
+                .onFailure { Log.w(TAG, "Convertir listas M3U de Xtream", it) }
+                .getOrDefault(emptyList())
             playlists.activeNow()?.let { p ->
-                if (catalog.needsSync(p, s.autoRefreshHours)) syncPlaylist(p.id)
+                if (p.id in upgraded || catalog.needsSync(p, s.autoRefreshHours)) syncPlaylist(p.id)
                 else if (epg.needsSync(p)) runCatching { epg.sync(p) }
             }
             checkForUpdates(force = false)

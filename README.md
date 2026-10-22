@@ -1,6 +1,6 @@
 # IPTV (proyecto Lumen TV)
 
-Reproductor IPTV propio para **Amazon Fire TV / Fire TV Stick**, con diseño minimalista inspirado en Apple tvOS (modo claro y oscuro) y **VPN de Proton integrada**: eliges país y servidor desde la propia app, sin abrir Proton VPN antes ni después.
+Reproductor IPTV propio para **Amazon Fire TV / Fire TV Stick**, con diseño minimalista inspirado en Apple tvOS (tema oscuro) y **VPN de Proton integrada**: eliges país y servidor desde la propia app, sin abrir Proton VPN antes ni después.
 
 > En el Fire TV la app se llama **IPTV**; «Lumen» es solo el nombre interno del código (`app.lumentv`). No incluye contenido. Reproduce las listas IPTV que tú configures (Xtream Codes o M3U).
 
@@ -34,7 +34,7 @@ Capturas de la app real (emulador Android TV con datos de demostración):
 | ![Inicio](design/screenshots/03-inicio.png) | ![TV en directo](design/screenshots/04-tv-en-directo.png) |
 | ![Reproductor](design/screenshots/05-reproductor-directo.png) | ![Guía EPG](design/screenshots/11-guia-epg.png) |
 | ![Cine](design/screenshots/07-cine.png) | ![VPN](design/screenshots/19-vpn-negociando.png) |
-| ![Inicio modo claro](design/screenshots/17-inicio-claro.png) | ![Ajustes](design/screenshots/16-ajustes-claro.png) |
+| ![Ajustes](design/screenshots/14-ajustes.png) | ![Reproductor](design/screenshots/22-reproductor-pelicula.png) |
 
 ---
 
