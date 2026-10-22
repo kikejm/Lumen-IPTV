@@ -37,32 +37,32 @@ colors:
   tile-catchup: "#FF9F0A"
 typography:
   large-title:
-    fontFamily: Inter
+    fontFamily: Alan Sans
     fontSize: 32px
-    fontWeight: 700
+    fontWeight: 800
     letterSpacing: -0.02em
   title:
-    fontFamily: Inter
+    fontFamily: Alan Sans
     fontSize: 22px
-    fontWeight: 600
+    fontWeight: 800
     letterSpacing: -0.01em
   headline:
-    fontFamily: Inter
+    fontFamily: Alan Sans
     fontSize: 17px
-    fontWeight: 600
+    fontWeight: 800
   body:
-    fontFamily: Inter
+    fontFamily: Alan Sans
     fontSize: 14px
     fontWeight: 400
     lineHeight: 20px
   callout:
-    fontFamily: Inter
+    fontFamily: Alan Sans
     fontSize: 13px
-    fontWeight: 500
+    fontWeight: 400
   caption:
-    fontFamily: Inter
+    fontFamily: Alan Sans
     fontSize: 11px
-    fontWeight: 500
+    fontWeight: 400
     letterSpacing: 0.04em
 rounded:
   sm: 10px
@@ -137,7 +137,7 @@ Lumen es una app de TV que se usa **a 3 metros y solo con el mando del Fire TV**
 
 ## Typography
 
-Inter (empaquetada en `res/font`, Fire TV no tiene Google Play Services para fuentes descargables), como sustituto libre de SF Pro. Escala basada en la guía de tipografía de Android TV: nada por debajo de 11 sp, cuerpo a 14 sp. Títulos con tracking ligeramente negativo, como tvOS.
+**Alan Sans** (Google Fonts, SIL OFL 1.1), empaquetada en `res/font` como dos instancias estáticas de la fuente variable: **800 para títulos** (`large-title`, `title`, `headline`, nombres de mosaicos) y **400 para todo el texto**; no se usan otros pesos. Va empaquetada porque Fire TV no tiene Google Play Services para fuentes descargables, y estática porque Fire OS 6 (Android 7.1) no aplica el eje `wght`. Los símbolos del mando (◀ ▶ ☰) no están en Alan Sans y salen de la fuente del sistema. Escala basada en la guía de tipografía de Android TV: nada por debajo de 11 sp, cuerpo a 14 sp. Títulos con tracking ligeramente negativo, como tvOS.
 
 ## Layout
 
@@ -145,7 +145,7 @@ Inter (empaquetada en `res/font`, Fire TV no tiene Google Play Services para fue
 - Barra superior común (`TopBar`): marca · pestañas en *segmented control* · píldora VPN · buscar · ajustes · reloj.
 - Patrones de pantalla:
   - **Inicio**: "Sigue viendo" (tarjeta ancha) → "Accesos" (6 mosaicos) → fila de favoritos → pie con estado de la lista.
-  - **TV en directo**: canales con programa actual · previsualización 16:9 + EPG, que se lleva el espacio sobrante. Las categorías (190 dp) están plegadas: ◀ desde los canales las despliega a la izquierda; ▶ o elegir una las pliega y devuelve el foco a los canales. Entre ambas columnas hay siempre un separador (línea + asa + flecha ‹/›) que indica que hay un panel plegado. Encima de los canales, píldoras de calidad (Todas · 4K · FHD · HD · SD · HEVC, solo las presentes en la categoría) deducidas del nombre del canal.
+  - **TV en directo**: canales con programa actual · previsualización 16:9 + EPG, que se lleva el espacio sobrante. Las categorías (190 dp) están plegadas: ◀ desde los canales las despliega a la izquierda; ▶ o elegir una las pliega y devuelve el foco a los canales. Entre ambas columnas hay siempre un separador (línea + asa + flecha ‹/›) que indica que hay un panel plegado. Encima de los canales, píldoras de calidad (Todas · FHD · FHD HEVC · HD · SD, solo las presentes en la categoría; cada canal cae en una sola) deducidas del nombre del canal.
   - **Cine / Series**: fondo con el arte del elemento enfocado, *hero* con título/metadatos, raíl de categorías y rejilla de pósters 2:3.
   - **VPN**: panel de estado (330 dp) · países con bandera · servidores del país.
   - **Ajustes**: secciones a la izquierda, filas valor/acción a la derecha.

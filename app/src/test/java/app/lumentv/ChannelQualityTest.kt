@@ -11,38 +11,40 @@ import org.junit.Test
 class ChannelQualityTest {
 
     @Test
-    fun resolution_fromTypicalProviderNames() {
-        assertEquals(QualityFilter.FHD, ChannelQuality.resolutionOf("CANAL HISTORIA FHD"))
-        assertEquals(QualityFilter.HD, ChannelQuality.resolutionOf("CANAL HISTORIA HD"))
-        assertEquals(QualityFilter.SD, ChannelQuality.resolutionOf("CANAL HISTORIA SD"))
-        assertEquals(QualityFilter.FHD, ChannelQuality.resolutionOf("|ES| DAZN 1 FHD HEVC"))
-        assertEquals(QualityFilter.UHD, ChannelQuality.resolutionOf("ES: Movistar Liga 4K HDR"))
-        assertEquals(QualityFilter.HD, ChannelQuality.resolutionOf("ES: La 1 [HD]"))
-        assertEquals(QualityFilter.FHD, ChannelQuality.resolutionOf("Antena 3 1080p"))
-        assertEquals(QualityFilter.HD, ChannelQuality.resolutionOf("cuatro hd+"))
+    fun quality_fromTypicalProviderNames() {
+        assertEquals(QualityFilter.FHD, ChannelQuality.of("CANAL HISTORIA FHD"))
+        assertEquals(QualityFilter.FHD_HEVC, ChannelQuality.of("CANAL HISTORIA FHD HEVC"))
+        assertEquals(QualityFilter.FHD_HEVC, ChannelQuality.of("CANAL HISTORIA FHD HECV"))
+        assertEquals(QualityFilter.HD, ChannelQuality.of("CANAL HISTORIA HD"))
+        assertEquals(QualityFilter.SD, ChannelQuality.of("CANAL HISTORIA SD"))
+        assertEquals(QualityFilter.FHD_HEVC, ChannelQuality.of("|ES| DAZN 1 FHD H.265"))
+        assertEquals(QualityFilter.HD, ChannelQuality.of("ES: La 1 [HD]"))
+        assertEquals(QualityFilter.HD, ChannelQuality.of("cuatro hd+"))
     }
 
     @Test
-    fun resolution_ignoresTagsInsideWords() {
-        assertNull(ChannelQuality.resolutionOf("HDTV Channel"))
-        assertNull(ChannelQuality.resolutionOf("SDTV Noticias"))
-        assertNull(ChannelQuality.resolutionOf("Canal Historia"))
+    fun quality_ignoresTagsInsideWordsAndOtherResolutions() {
+        assertNull(ChannelQuality.of("HDTV Channel"))
+        assertNull(ChannelQuality.of("SDTV Noticias"))
+        assertNull(ChannelQuality.of("Canal Historia"))
+        assertNull(ChannelQuality.of("DEP: Tenis 4K"))
     }
 
     @Test
-    fun hevcFilter_matchesCodecTag() {
-        assertTrue(ChannelQuality.matches("|ES| DAZN 1 FHD HEVC", QualityFilter.HEVC))
-        assertTrue(ChannelQuality.matches("CANAL HISTORIA FHD HECV", QualityFilter.HEVC))
-        assertTrue(ChannelQuality.matches("Telecinco H.265", QualityFilter.HEVC))
-        assertFalse(ChannelQuality.matches("CANAL HISTORIA FHD", QualityFilter.HEVC))
-        assertTrue(ChannelQuality.matches("|ES| DAZN 1 FHD HEVC", QualityFilter.FHD))
+    fun filters_areExclusive() {
+        assertTrue(ChannelQuality.matches("CANAL HISTORIA FHD", QualityFilter.FHD))
+        assertFalse(ChannelQuality.matches("CANAL HISTORIA FHD HEVC", QualityFilter.FHD))
+        assertTrue(ChannelQuality.matches("CANAL HISTORIA FHD HEVC", QualityFilter.FHD_HEVC))
+        assertFalse(ChannelQuality.matches("CANAL HISTORIA FHD", QualityFilter.HD))
+        assertTrue(ChannelQuality.matches("Canal sin etiqueta", QualityFilter.ALL))
+        assertFalse(ChannelQuality.matches("Canal sin etiqueta", QualityFilter.SD))
     }
 
     @Test
     fun available_listsOnlyPresentQualities() {
         val names = listOf("A FHD", "A HD", "A FHD HEVC", "B")
         assertEquals(
-            listOf(QualityFilter.ALL, QualityFilter.FHD, QualityFilter.HD, QualityFilter.HEVC),
+            listOf(QualityFilter.ALL, QualityFilter.FHD, QualityFilter.FHD_HEVC, QualityFilter.HD),
             ChannelQuality.available(names),
         )
         assertEquals(listOf(QualityFilter.ALL), ChannelQuality.available(listOf("Canal sin etiqueta")))

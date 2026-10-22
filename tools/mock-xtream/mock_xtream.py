@@ -1,5 +1,5 @@
 """Servidor Xtream Codes de demostración para capturas de Lumen (datos ficticios)."""
-import base64, json, os, random, time, colorsys
+import base64, json, os, random, re, time, colorsys
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from PIL import Image, ImageDraw, ImageFont
@@ -23,6 +23,10 @@ CHANNELS = [
     ("INF: Clan HD", 4), ("INF: Boing HD", 4), ("INF: Disney Jr", 4),
     ("MUS: Hits FM TV", 5), ("MUS: Sol Música", 5), ("DOC: Historia HD", 6), ("DOC: Naturaleza 4K", 6), ("DOC: Odisea HD", 6),
     ("XXX: Canal privado", 7),
+    # Duplicados por calidad, como en las listas reales (para probar el filtro de calidad).
+    ("DOC: Historia FHD", 6), ("DOC: Historia FHD HEVC", 6), ("DOC: Historia SD", 6),
+    ("ES: La 1 FHD HEVC", 0), ("ES: La 1 SD", 0), ("ES: Antena 3 FHD HEVC", 0), ("ES: Antena 3 SD", 0),
+    ("DEP: Liga 1 FHD HEVC", 1), ("DEP: Liga 1 SD", 1),
 ]
 PROGRAMS = ["Telediario", "FBI: Most Wanted", "Mentes criminales", "Pesca radical", "El tiempo", "Fútbol: Jornada 9",
             "Documental: Océanos", "Cine: Horizonte rojo", "Informe semanal", "La ruleta", "Noticias 24h", "Concierto en vivo",
@@ -43,7 +47,7 @@ def hue_color(i, s=0.65, v=0.85):
     return int(r * 255), int(g * 255), int(b * 255)
 
 def font(size, bold=True):
-    return ImageFont.truetype(os.path.join(FONT, "inter_bold.ttf" if bold else "inter_medium.ttf"), size)
+    return ImageFont.truetype(os.path.join(FONT, "alan_sans_extrabold.ttf" if bold else "alan_sans_regular.ttf"), size)
 
 def make_images():
     os.makedirs(IMG, exist_ok=True)
@@ -52,7 +56,7 @@ def make_images():
         if os.path.exists(p): continue
         im = Image.new("RGBA", (320, 200), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
         d.rounded_rectangle([20, 30, 300, 170], 28, fill=hue_color(i))
-        label = name.split(": ", 1)[-1].replace(" HD", "").replace(" FHD", "").replace(" 4K", "")
+        label = re.sub(r" (FHD HEVC|FHD|HD|SD|4K)$", "", name.split(": ", 1)[-1])
         f = font(40 if len(label) < 10 else 30)
         w = d.textlength(label, font=f); d.text(((320 - w) / 2, 75), label, font=f, fill="white")
         im.save(p)

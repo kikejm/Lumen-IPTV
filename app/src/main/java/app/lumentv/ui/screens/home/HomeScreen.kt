@@ -153,7 +153,7 @@ fun HomeScreen(nav: Navigator) {
                                         contentAlignment = Alignment.Center,
                                     ) { Icon(t.icon, contentDescription = null, tint = t.tint, modifier = Modifier.size(20.dp)) }
                                     Column {
-                                        LText(t.label, style = Lumen.type.callout.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp), maxLines = 1)
+                                        LText(t.label, style = Lumen.type.callout.copy(fontWeight = FontWeight.ExtraBold, fontSize = 15.sp), maxLines = 1)
                                         LText(t.caption, style = Lumen.type.caption, color = c.textSecondary, maxLines = 1)
                                     }
                                 }

@@ -8,7 +8,7 @@ Reproductor IPTV propio para **Amazon Fire TV / Fire TV Stick**, con diseño min
 
 | | |
 |---|---|
-| 📺 **TV en directo** | Categorías plegables, filtro por calidad (4K/FHD/HD/SD/HEVC), favoritos, historial, previsualización con sonido, EPG actual y siguiente, zapping con ▲▼ |
+| 📺 **TV en directo** | Categorías plegables, filtro por calidad (FHD, FHD HEVC, HD, SD), favoritos, historial, previsualización con sonido, EPG actual y siguiente, zapping con ▲▼ |
 | 🎬 **Cine y series** | Rejilla de pósters, ficha con sinopsis y reparto, temporadas/episodios, "Continuar viendo", auto-siguiente episodio |
 | 🗓️ **Guía EPG** | Parrilla por categoría; EPG del proveedor + **fuentes XMLTV externas** (.xml/.gz) + desfase horario |
 | ⏪ **Catch-up** | Programas pasados de los canales con archivo, también desde la guía |
@@ -175,4 +175,4 @@ Ver [.env.example](.env.example): valores de lista precargados, empaquetado de `
 
 ## Licencias de terceros
 
-AndroidX / Jetpack Compose / Media3 (Apache 2.0), WireGuard Android tunnel (Apache 2.0), OkHttp (Apache 2.0), Coil (Apache 2.0), ZXing (Apache 2.0), Inter (SIL OFL 1.1). Proton VPN es marca de Proton AG; Lumen no está afiliado a Proton ni a IPTV Smarters.
+AndroidX / Jetpack Compose / Media3 (Apache 2.0), WireGuard Android tunnel (Apache 2.0), OkHttp (Apache 2.0), Coil (Apache 2.0), ZXing (Apache 2.0), Alan Sans (SIL OFL 1.1, licencia en `docs/licencias/AlanSans-OFL.txt`). Proton VPN es marca de Proton AG; Lumen no está afiliado a Proton ni a IPTV Smarters.

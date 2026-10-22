@@ -173,21 +173,21 @@ class ImportServer(private val scope: CoroutineScope, private val json: Json) {
         }.getOrNull()
 
         private val PAGE = """
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Alan+Sans:wght@400;800&display=swap" rel="stylesheet">
 <title>IPTV · Configurar</title>
 <style>
 :root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--text:#000;--muted:#3c3c4399;--accent:#007aff;--ok:#34c759;--err:#ff3b30}
 @media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--text:#fff;--muted:#ebebf599;--accent:#0a84ff;--ok:#30d158;--err:#ff453a}}
-*{box-sizing:border-box}body{margin:0;font:17px -apple-system,system-ui,Inter,sans-serif;background:var(--bg);color:var(--text);padding:24px 16px 48px}
-h1{font-size:34px;margin:8px 0 4px}p.sub{color:var(--muted);margin:0 0 24px}
+*{box-sizing:border-box}body{margin:0;font:400 17px 'Alan Sans',-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--text);padding:24px 16px 48px}
+h1{font-size:34px;font-weight:800;margin:8px 0 4px}p.sub{color:var(--muted);margin:0 0 24px}
 section{background:var(--card);border-radius:18px;padding:20px;margin:0 0 20px}
-h2{font-size:22px;margin:0 0 6px}small{color:var(--muted);display:block;margin-bottom:14px}
+h2{font-size:22px;font-weight:800;margin:0 0 6px}small{color:var(--muted);display:block;margin-bottom:14px}
 label{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
 input,textarea{width:100%;font:inherit;padding:12px 14px;border-radius:12px;border:1px solid #8884;background:transparent;color:inherit}
 textarea{min-height:120px;font-family:ui-monospace,monospace;font-size:13px}
-button{margin-top:16px;width:100%;font-family:inherit;font-weight:600;font-size:17px;padding:14px;border:0;border-radius:14px;background:var(--accent);color:#fff}
+button{margin-top:16px;width:100%;font-family:inherit;font-weight:400;font-size:17px;padding:14px;border:0;border-radius:14px;background:var(--accent);color:#fff}
 .seg{display:flex;gap:8px;margin-bottom:8px}.seg button{margin:0;background:#8882;color:inherit}.seg button.on{background:var(--accent);color:#fff}
-.msg{margin-top:12px;font-weight:600}.ok{color:var(--ok)}.err{color:var(--err)}
+.msg{margin-top:12px;font-weight:400}.ok{color:var(--ok)}.err{color:var(--err)}
 </style></head><body>
 <h1>IPTV</h1><p class="sub">Configura la tele desde aquí. Los datos van directos a tu Fire TV por tu Wi‑Fi.</p>
 <section><h2>Servidores VPN (Proton)</h2>

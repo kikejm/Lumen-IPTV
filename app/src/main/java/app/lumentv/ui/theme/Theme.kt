@@ -82,22 +82,21 @@ val LightLumenColors = LumenColors(
     scrim = Color(0xB3F2F2F7),
 )
 
-val Inter = FontFamily(
-    Font(R.font.inter_regular, FontWeight.Normal),
-    Font(R.font.inter_medium, FontWeight.Medium),
-    Font(R.font.inter_semibold, FontWeight.SemiBold),
-    Font(R.font.inter_bold, FontWeight.Bold),
+/** Alan Sans (Google Fonts, OFL) en dos pesos fijos: 800 para títulos y 400 para el resto. */
+val AlanSans = FontFamily(
+    Font(R.font.alan_sans_regular, FontWeight.Normal),
+    Font(R.font.alan_sans_extrabold, FontWeight.ExtraBold),
 )
 
 /** Escala tipográfica en sp para 1080p a ~3 m (los dp de TV ya escalan con la densidad). */
 @Immutable
 data class LumenType(
-    val largeTitle: TextStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 32.sp, letterSpacing = (-0.02).em),
-    val title: TextStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 22.sp, letterSpacing = (-0.01).em),
-    val headline: TextStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
-    val body: TextStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
-    val callout: TextStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 13.sp),
-    val caption: TextStyle = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = 11.sp, letterSpacing = 0.04.em),
+    val largeTitle: TextStyle = TextStyle(fontFamily = AlanSans, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp, letterSpacing = (-0.02).em),
+    val title: TextStyle = TextStyle(fontFamily = AlanSans, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, letterSpacing = (-0.01).em),
+    val headline: TextStyle = TextStyle(fontFamily = AlanSans, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp),
+    val body: TextStyle = TextStyle(fontFamily = AlanSans, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
+    val callout: TextStyle = TextStyle(fontFamily = AlanSans, fontWeight = FontWeight.Normal, fontSize = 13.sp),
+    val caption: TextStyle = TextStyle(fontFamily = AlanSans, fontWeight = FontWeight.Normal, fontSize = 11.sp, letterSpacing = 0.04.em),
 )
 
 object LumenDimens {

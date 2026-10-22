@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
@@ -68,7 +70,6 @@ import app.lumentv.data.db.PlaylistEntity
 import app.lumentv.player.PlayerFactory
 import app.lumentv.ui.components.Artwork
 import app.lumentv.ui.components.CategoryColumn
-import app.lumentv.ui.components.Chip
 import app.lumentv.ui.components.EmptyState
 import app.lumentv.ui.components.FocusSurface
 import app.lumentv.ui.components.Gap
@@ -142,6 +143,8 @@ fun LiveScreen(nav: Navigator) {
     // Tras elegir categoría, el foco espera a que llegue la lista nueva para ir a su primer canal.
     var focusFirstChannel by remember { mutableStateOf(false) }
     val categoryFocus = remember { FocusRequester() }
+    // Foco inicial en un canal una vez por visita: al volver del reproductor, el que se estaba viendo.
+    var initialFocusDone by remember { mutableStateOf(false) }
     val channelFocus = remember { FocusRequester() }
     val pageReady = page.categoryId == selected
     val categoriesVisible = showCategories || (pageReady && channels.isEmpty())
@@ -238,8 +241,6 @@ fun LiveScreen(nav: Navigator) {
                         )
                     } else {
                         val listState = rememberLazyListState()
-                        // Foco inicial en el primer canal (una sola vez por visita a la pantalla).
-                        var initialFocusDone by rememberSaveable { mutableStateOf(false) }
                         LaunchedEffect(channels.isNotEmpty()) {
                             if (!initialFocusDone && channels.isNotEmpty()) {
                                 delay(150)
@@ -277,7 +278,6 @@ fun LiveScreen(nav: Navigator) {
             Column(Modifier.weight(previewWeight).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
                     if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
-                    if (preview != null) Chip("● En directo", c.danger, filled = true, modifier = Modifier.padding(10.dp))
                 }
                 focused?.let { ch ->
                     LText(ch.name, style = Lumen.type.headline, maxLines = 1)
@@ -352,12 +352,12 @@ fun LiveScreen(nav: Navigator) {
 @Composable
 private fun QualityRow(options: List<QualityFilter>, selected: QualityFilter, onSelect: (QualityFilter) -> Unit, onFocus: () -> Unit) {
     val c = Lumen.colors
+    // Desplazable: con las categorías abiertas la columna de canales no tiene ancho para las cinco píldoras.
     Row(
-        Modifier.padding(start = 6.dp, end = 6.dp, bottom = 8.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 6.dp, end = 6.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        LText("CALIDAD", style = Lumen.type.caption, color = c.textTertiary)
         options.forEach { q ->
             val on = q == selected
             FocusSurface(
@@ -369,7 +369,7 @@ private fun QualityRow(options: List<QualityFilter>, selected: QualityFilter, on
                 contentColor = if (on) c.onAccent else c.textSecondary,
                 focusedContentColor = if (on) c.onAccent else c.textPrimary,
             ) {
-                LText(q.label, style = Lumen.type.callout, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
+                LText(q.label, style = Lumen.type.callout, maxLines = 1, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
             }
         }
     }
