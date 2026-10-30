@@ -110,14 +110,13 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
 
     /**
      * Canal que suena en la previsualización. No sigue al foco: moverse por canales o categorías no
-     * lo cambia; solo OK sobre otro canal ([preview]). Al entrar, el primero que recibe el foco.
+     * lo cambia; solo OK sobre un canal ([preview]). Al entrar no suena nada hasta el primer OK.
      */
     private val _previewChannel = MutableStateFlow<ChannelEntity?>(null)
     val previewChannel: StateFlow<ChannelEntity?> = _previewChannel
 
     fun onChannelFocused(ch: ChannelEntity) {
         focusedChannel.value = ch
-        if (_previewChannel.value == null) _previewChannel.value = ch
     }
 
     fun preview(ch: ChannelEntity) {

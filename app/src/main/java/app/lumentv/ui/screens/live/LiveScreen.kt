@@ -346,7 +346,11 @@ fun LiveScreen(nav: Navigator) {
                     Box(Modifier.fillMaxSize().clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
                         if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
                         when {
-                            preview == null -> Unit
+                            // Al entrar no se carga ningún canal: suena el primero al que se dé OK.
+                            preview == null -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(40.dp))
+                                LText("Pulse OK", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f))
+                            }
                             previewFailed -> LText("No disponible", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
                             previewState != Player.STATE_READY -> LoadingSpinner(Modifier.align(Alignment.Center))
                         }
@@ -354,7 +358,10 @@ fun LiveScreen(nav: Navigator) {
                     // Encima, transparente: solo aporta el foco y el anillo.
                     FocusSurface(
                         onClick = {
-                            preview?.let { ch ->
+                            val ch = preview
+                            if (ch == null) {
+                                focused?.let(vm::preview)
+                            } else {
                                 val index = channels.indexOfFirst { it.streamId == ch.streamId }
                                 if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
                             }
@@ -402,6 +409,7 @@ fun LiveScreen(nav: Navigator) {
         }
         Gap(height = 10.dp)
         when {
+            previewFocused && preview == null -> KeyHints("OK" to "Previsualizar", "◀" to "Canales")
             previewFocused -> KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Canales")
             categoriesVisible -> KeyHints("OK" to "Elegir", "☰" to "Opciones", "▶" to "Canales")
             focused != null && focused?.streamId == preview?.streamId ->
