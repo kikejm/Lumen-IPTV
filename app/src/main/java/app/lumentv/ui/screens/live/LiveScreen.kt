@@ -115,7 +115,9 @@ fun LiveScreen(nav: Navigator) {
     // Al volver de pantalla completa llega su reproductor con el canal que sonaba (quizá tras hacer zapping):
     // se enfoca y previsualiza ese canal ya, antes de leer el estado, para que la previsualización no lo recargue.
     val returned = remember {
-        graph.players.takeHandOff()?.also { graph.playback.current?.channel?.let(vm::showNow) }
+        val back = graph.playback.takeReturnFocus(Routes.LIVE)
+        val ch = graph.playback.current?.channel?.takeIf { it.streamId == back?.itemId }
+        graph.players.takeHandOff().also { player -> ch?.let { vm.returnTo(it, playing = player != null) } }
     }
     val playlist by vm.playlist.collectAsState()
     val categories by vm.categories.collectAsState()

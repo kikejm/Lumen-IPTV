@@ -7,6 +7,7 @@ import app.lumentv.data.db.MovieEntity
 import app.lumentv.data.db.PlaylistEntity
 import app.lumentv.data.db.SeriesEntity
 import app.lumentv.di.AppGraph
+import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.screens.live.CAT_ALL
 import app.lumentv.ui.screens.live.CAT_FAVORITES
 import app.lumentv.ui.screens.live.CAT_RECENT
@@ -26,6 +27,11 @@ class MoviesViewModel(private val graph: AppGraph) : ViewModel() {
     val playlist: StateFlow<PlaylistEntity?> = graph.playlists.active.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val selectedCategory = MutableStateFlow(CAT_ALL)
     val focused = MutableStateFlow<MovieEntity?>(null)
+
+    /** Póster que recupera el foco al volver a la pantalla (de la ficha, del reproductor o con «Reanudar» de Inicio). */
+    var restoreId: String? = graph.playback.takeReturnFocus(Routes.MOVIES)?.also { r ->
+        r.categoryId?.takeIf { !isCategoryLocked(it) }?.let { selectedCategory.value = it }
+    }?.itemId
 
     val favoriteIds = playlist.filterNotNull().flatMapLatest { graph.library.favoriteIds(it.id, ContentKind.VOD) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
@@ -69,6 +75,11 @@ class SeriesViewModel(private val graph: AppGraph) : ViewModel() {
     val playlist: StateFlow<PlaylistEntity?> = graph.playlists.active.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val selectedCategory = MutableStateFlow(CAT_ALL)
     val focused = MutableStateFlow<SeriesEntity?>(null)
+
+    /** Póster que recupera el foco al volver a la pantalla (de la ficha o con «Reanudar» de Inicio). */
+    var restoreId: String? = graph.playback.takeReturnFocus(Routes.SERIES)?.also { r ->
+        r.categoryId?.takeIf { !isCategoryLocked(it) }?.let { selectedCategory.value = it }
+    }?.itemId
 
     val favoriteIds = playlist.filterNotNull().flatMapLatest { graph.library.favoriteIds(it.id, ContentKind.SERIES) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())

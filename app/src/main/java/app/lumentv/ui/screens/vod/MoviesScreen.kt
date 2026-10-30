@@ -57,7 +57,11 @@ fun MoviesScreen(nav: Navigator) {
         onCategoryMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) catMenu = it },
         items = posters,
         focused = focused?.toPoster(),
-        onFocus = { p -> vm.focused.value = movies.firstOrNull { it.streamId == p.id } },
+        restoreId = vm.restoreId,
+        onFocus = { p ->
+            vm.restoreId = p.id
+            vm.focused.value = movies.firstOrNull { it.streamId == p.id }
+        },
         onOpen = { nav.go(Routes.movie(it.id)) },
         onItemMenu = { itemMenu = it },
         favorites = favorites,

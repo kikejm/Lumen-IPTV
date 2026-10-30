@@ -25,6 +25,9 @@ data class PlayItem(
     val extra: String = "",
 )
 
+/** Qué enfocar al volver a una pantalla y, si esta se crea de nuevo, qué categoría abrir. */
+data class ReturnFocus(val itemId: String, val categoryId: String? = null)
+
 /**
  * Cola de reproducción compartida entre pantallas. Se rellena antes de navegar al reproductor:
  * en directo contiene todos los canales de la categoría (zapping con ▲▼), en series los episodios
@@ -49,6 +52,21 @@ class PlaybackSession {
     }
 
     fun hasNext() = index < queue.size - 1
+
+    private val returnFocus = mutableMapOf<String, ReturnFocus>()
+
+    /**
+     * Al salir del reproductor (o al apilar pantallas debajo con «Reanudar» de Inicio) se apunta, por ruta,
+     * el elemento que la pantalla de destino debe enfocar. Si ya había una categoría para ese mismo elemento, se conserva.
+     */
+    fun setReturnFocus(route: String?, itemId: String, categoryId: String? = null) {
+        route ?: return
+        val keep = returnFocus[route]?.takeIf { it.itemId == itemId }?.categoryId
+        returnFocus[route] = ReturnFocus(itemId, categoryId ?: keep)
+    }
+
+    /** Lo consume la pantalla de [route] al componerse (una vez). */
+    fun takeReturnFocus(route: String): ReturnFocus? = returnFocus.remove(route)
 }
 
 /** Construye URLs de reproducción a partir de la lista activa. */

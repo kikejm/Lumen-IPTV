@@ -320,12 +320,18 @@ fun PlayerScreen(nav: Navigator) {
 
     // De vuelta a TV en directo, la previsualización se queda este reproductor y el canal sigue sin recargar.
     // Se entrega antes de salir porque la pantalla de destino se compone antes de que esta se cierre.
+    // La pantalla a la que se vuelve enfoca lo que sonaba (el canal tras hacer zapping, el episodio tras el auto-siguiente).
+    fun exit() {
+        item?.let { graph.playback.setReturnFocus(nav.previousRoute, it.itemId) }
+        nav.back()
+    }
+
     BackHandler(enabled = !(overlay && error == null)) {
         if (isLive && error == null && item?.channel != null && nav.previousRoute == Routes.LIVE) {
             handedBack = true
             graph.players.handOff(player)
         }
-        nav.back()
+        exit()
     }
 
     Box(
@@ -481,7 +487,7 @@ fun PlayerScreen(nav: Navigator) {
         Box(Modifier.fillMaxSize()) {
             Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PillButton("Reintentar", onClick = ::retryNow, primary = true, modifier = Modifier.focusRequester(errorFocus))
-                PillButton("Salir", onClick = { nav.back() })
+                PillButton("Salir", onClick = ::exit)
             }
         }
     }

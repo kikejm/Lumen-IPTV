@@ -123,10 +123,14 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
         _previewChannel.value = ch
     }
 
-    /** Enfoca y previsualiza un canal a la vez (al volver de pantalla completa con él sonando). */
-    fun showNow(ch: ChannelEntity) {
+    /**
+     * Al volver de pantalla completa: enfoca el canal que sonaba y, si llega su reproductor ([playing]),
+     * lo previsualiza. Si la pantalla es nueva («Reanudar» desde Inicio) abre además la categoría del canal.
+     */
+    fun returnTo(ch: ChannelEntity, playing: Boolean) {
+        if (focusedChannel.value == null && !isCategoryLocked(ch.categoryId)) selectedCategory.value = ch.categoryId
         focusedChannel.value = ch
-        _previewChannel.value = ch
+        if (playing) _previewChannel.value = ch
     }
 
     fun isCategoryLocked(id: String) = graph.parental.isLocked(ContentKind.LIVE.name, id)
