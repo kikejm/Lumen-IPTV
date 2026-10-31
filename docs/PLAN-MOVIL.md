@@ -158,7 +158,7 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 ### Fase 3 — Contenido (4–6 días)
 
 - TV en directo: previsualización fija + lista (respetando `PlayerFactory.claimStream`/`handOff`: una sola conexión por cuenta).
-- Cine y Series: rejilla `LazyVerticalGrid(GridCells.Adaptive(110.dp))` (3 columnas en vertical, 6 en horizontal, más en tableta), fichas, Mi lista, Recientes.
+- Cine y Series: rejilla `LazyVerticalGrid(GridCells.Adaptive(100.dp))` (3 columnas en vertical, 6 en horizontal, más en tableta), fichas, Mi lista, Recientes.
 - Guía EPG táctil (scroll en dos ejes sincronizado), búsqueda, favoritos, catch-up.
 
 ### Fase 4 — Reproductor móvil (3–4 días)

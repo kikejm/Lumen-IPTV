@@ -61,6 +61,7 @@ import app.lumentv.data.db.PlaylistEntity
 import app.lumentv.data.epg.Program
 import app.lumentv.player.PlayerFactory
 import app.lumentv.ui.adaptive.LocalWidthClass
+import app.lumentv.ui.catchupRoute
 import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.components.Artwork
 import app.lumentv.ui.components.EmptyState
@@ -303,8 +304,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
                     if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
                 })
                 if (ch.tvArchive) add(SheetOption("Catch-up (ver lo emitido)", Icons.Rounded.History, detail = "Programas pasados") {
-                    vm.showNow(ch)
-                    nav.go(Routes.CATCHUP)
+                    nav.go(catchupRoute(ch.streamId))
                 })
             },
             onDismiss = { channelMenu = null },

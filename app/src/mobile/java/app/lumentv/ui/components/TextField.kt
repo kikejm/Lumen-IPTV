@@ -25,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -51,6 +53,7 @@ fun LumenTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     onDone: () -> Unit = {},
+    focusRequester: FocusRequester? = null,
 ) {
     val c = Lumen.colors
     var focused by remember { mutableStateOf(false) }
@@ -73,6 +76,7 @@ fun LumenTextField(
             keyboardActions = KeyboardActions(onDone = { onDone() }, onGo = { onDone() }),
             modifier = Modifier
                 .fillMaxWidth()
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onFocusChanged { focused = it.isFocused },
             decorationBox = { inner ->
                 Row(

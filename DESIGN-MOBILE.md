@@ -24,7 +24,7 @@ typography:
   callout: {fontFamily: Alan Sans, fontWeight: 400, fontSize: 13sp}
   caption: {fontFamily: Alan Sans, fontWeight: 400, fontSize: 11sp, letterSpacing: 0.04em, textTransform: uppercase}
 rounded: {row: 10dp, card: 14dp, panel: 20dp, pill: 999dp}
-spacing: {gutter: 16dp, section: 24dp, touch-min: 48dp, rail: 72dp, rail-expanded: 80dp, bottom-bar: 64dp, mini-player: 64dp, poster-min: 110dp}
+spacing: {gutter: 16dp, section: 24dp, touch-min: 48dp, rail: 72dp, rail-expanded: 80dp, bottom-bar: 64dp, mini-player: 64dp, poster-min: 100dp}
 ---
 
 # DESIGN-MOBILE.md — IPTV para móvil y tableta
@@ -82,7 +82,7 @@ Alan Sans empaquetada (`res/font`): 800 para títulos, 400 para el resto. Sobre 
 | Ajustes | Lista de secciones → detalle | Maestro-detalle | Maestro-detalle |
 | Opciones (☰ en TV) | Hoja inferior | Hoja lateral derecha (360 dp) | Hoja lateral |
 
-Rejillas de pósters: `GridCells.Adaptive(110.dp)`; el número de columnas sale solo.
+Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale solo (3 en vertical, 6 en horizontal, 8–10 en tableta).
 
 ### Gestos e interacción
 

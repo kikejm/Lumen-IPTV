@@ -53,7 +53,10 @@ import app.lumentv.ui.components.LText
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
+import app.lumentv.ui.screens.catchup.CatchupScreen
+import app.lumentv.ui.screens.guide.GuideScreen
 import app.lumentv.ui.screens.home.HomeScreen
+import app.lumentv.ui.screens.search.SearchScreen
 import app.lumentv.ui.screens.live.LiveScreen
 import app.lumentv.ui.screens.vod.MovieDetailScreen
 import app.lumentv.ui.screens.vod.MoviesScreen
@@ -77,6 +80,10 @@ private val MainDestinations = listOf(
 private val MainRoutes = MainDestinations.map { it.route }.toSet()
 
 private const val ONBOARDING = "onboarding"
+
+/** Catch-up con el canal preseleccionado (desde el menú de un canal). */
+private const val CATCHUP_WITH_CHANNEL = "${Routes.CATCHUP}?ch={ch}"
+fun catchupRoute(channelId: String) = "${Routes.CATCHUP}?ch=$channelId"
 
 @Composable
 fun MobileRoot(graph: AppGraph) {
@@ -113,13 +120,16 @@ private fun MobileNavHost(startOnboarding: Boolean) {
             composable(Routes.PLAYLIST_EDIT, arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null })) {
                 PlaylistEditScreen(nav, insets, it.arguments?.getString("id")?.toLongOrNull(), isOnboarding = false)
             }
-            // Pantallas de las fases 3–5 del plan: de momento, un aviso.
+            // Pantallas de las fases 4–5 del plan: de momento, un aviso.
             composable(Routes.LIVE) { LiveScreen(nav, insets) }
             composable(Routes.MOVIES) { MoviesScreen(nav, insets) }
             composable(Routes.SERIES) { SeriesScreen(nav, insets) }
-            composable(Routes.GUIDE) { ComingSoonScreen(nav, insets, "Guía", phase = 3) }
-            composable(Routes.SEARCH) { ComingSoonScreen(nav, insets, "Buscar", phase = 3, detail = true) }
-            composable(Routes.CATCHUP) { ComingSoonScreen(nav, insets, "Catch-up", phase = 3, detail = true) }
+            composable(Routes.GUIDE) { GuideScreen(nav, insets) }
+            composable(Routes.SEARCH) { SearchScreen(nav, insets) }
+            // «catchup» a secas también entra aquí (el parámetro es opcional).
+            composable(CATCHUP_WITH_CHANNEL, arguments = listOf(navArgument("ch") { type = NavType.StringType; nullable = true; defaultValue = null })) {
+                CatchupScreen(nav, insets, it.arguments?.getString("ch"))
+            }
             composable(Routes.MOVIE_DETAIL, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
                 MovieDetailScreen(nav, insets, it.arguments?.getString("id").orEmpty())
             }
