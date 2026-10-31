@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -56,6 +57,10 @@ import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.screens.catchup.CatchupScreen
 import app.lumentv.ui.screens.guide.GuideScreen
 import app.lumentv.ui.screens.home.HomeScreen
+import app.lumentv.ui.screens.player.PlayerScreen
+import app.lumentv.ui.player.LocalMiniPlayer
+import app.lumentv.ui.player.MiniPlayerBar
+import app.lumentv.ui.player.MiniPlayerController
 import app.lumentv.ui.screens.search.SearchScreen
 import app.lumentv.ui.screens.live.LiveScreen
 import app.lumentv.ui.screens.vod.MovieDetailScreen
@@ -87,7 +92,8 @@ fun catchupRoute(channelId: String) = "${Routes.CATCHUP}?ch=$channelId"
 
 @Composable
 fun MobileRoot(graph: AppGraph) {
-    CompositionLocalProvider(LocalGraph provides graph, LocalWidthClass provides currentWidthClass()) {
+    val mini = remember { MiniPlayerController() }
+    CompositionLocalProvider(LocalGraph provides graph, LocalWidthClass provides currentWidthClass(), LocalMiniPlayer provides mini) {
         LumenTheme {
             // ¿Hay alguna lista? Si no, se empieza en el alta de lista (onboarding).
             val hasPlaylist by produceState<Boolean?>(null) { value = graph.playlists.activeNow() != null }
@@ -120,7 +126,7 @@ private fun MobileNavHost(startOnboarding: Boolean) {
             composable(Routes.PLAYLIST_EDIT, arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null })) {
                 PlaylistEditScreen(nav, insets, it.arguments?.getString("id")?.toLongOrNull(), isOnboarding = false)
             }
-            // Pantallas de las fases 4–5 del plan: de momento, un aviso.
+            // Pantallas de la fase 5 del plan: de momento, un aviso.
             composable(Routes.LIVE) { LiveScreen(nav, insets) }
             composable(Routes.MOVIES) { MoviesScreen(nav, insets) }
             composable(Routes.SERIES) { SeriesScreen(nav, insets) }
@@ -136,7 +142,7 @@ private fun MobileNavHost(startOnboarding: Boolean) {
             composable(Routes.SERIES_DETAIL, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
                 SeriesDetailScreen(nav, insets, it.arguments?.getString("id").orEmpty())
             }
-            composable(Routes.PLAYER) { ComingSoonScreen(nav, insets, "Reproductor", phase = 4, detail = true) }
+            composable(Routes.PLAYER) { PlayerScreen(nav, insets) }
             composable(Routes.MULTIVIEW) { ComingSoonScreen(nav, insets, "Multipantalla", phase = 5, detail = true) }
             composable(Routes.VPN) { ComingSoonScreen(nav, insets, "VPN", phase = 5, detail = true) }
             composable(Routes.SETTINGS) { ComingSoonScreen(nav, insets, "Ajustes", phase = 5, detail = true) }
@@ -149,12 +155,22 @@ private fun MobileNavHost(startOnboarding: Boolean) {
     val showBottomBar = showNav && widthClass == WidthClass.Compact
     var sides = WindowInsetsSides.Top + WindowInsetsSides.End
     if (!showRail) sides += WindowInsetsSides.Start // el raíl ya respeta el recorte de cámara
-    if (!showBottomBar) sides += WindowInsetsSides.Bottom // la barra inferior ya respeta la de gestos
+    // Mini reproductor: sobre la barra inferior en cualquier pantalla salvo el propio reproductor.
+    val mini = LocalMiniPlayer.current
+    val showMini = mini.player != null && route != Routes.PLAYER
+    if (!showBottomBar && !showMini) sides += WindowInsetsSides.Bottom // la barra inferior (o el mini reproductor) ya respeta la de gestos
     val insets = WindowInsets.safeDrawing.only(sides).asPaddingValues()
     Row(Modifier.fillMaxSize()) {
         if (showRail) SideRail(route, nav)
         Column(Modifier.weight(1f).fillMaxHeight()) {
             Box(Modifier.weight(1f)) { host(insets) }
+            if (showMini) {
+                MiniPlayerBar(
+                    mini,
+                    onOpen = { nav.go(Routes.PLAYER) },
+                    modifier = if (showBottomBar) Modifier else Modifier.navigationBarsPadding(),
+                )
+            }
             if (showBottomBar) BottomBar(route, nav)
         }
     }

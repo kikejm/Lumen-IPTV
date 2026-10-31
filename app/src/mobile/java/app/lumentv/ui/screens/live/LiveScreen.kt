@@ -102,6 +102,11 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     val scope = rememberCoroutineScope()
     val widthClass = LocalWidthClass.current
     val vm: LiveViewModel = viewModel { LiveViewModel(graph) }
+    // Al volver de pantalla completa llega su reproductor con el canal que sonaba (quizá tras hacer
+    // zapping): se previsualiza ese canal ya, antes de leer el estado, para no recargarlo.
+    val returned = remember {
+        graph.players.takeHandOff()?.also { graph.playback.current?.channel?.let(vm::showNow) }
+    }
     val playlist by vm.playlist.collectAsState()
     val categories by vm.categories.collectAsState()
     val selected by vm.selectedCategory.collectAsState()
@@ -121,7 +126,8 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
 
     // Reproductor de la previsualización. Vive con la pantalla (por encima de la maquetación), así
     // que al girar el móvil el vídeo sigue sonando aunque su vista se vuelva a crear.
-    val player = remember { graph.players.create() }
+    val player = remember { returned ?: graph.players.create() }
+    var handedOff by remember { mutableStateOf(false) }
     var previewState by remember { mutableIntStateOf(player.playbackState) }
     var previewFailed by remember { mutableStateOf(false) }
     var previewRetry by remember { mutableIntStateOf(0) }
@@ -140,7 +146,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
-            player.release()
+            if (!handedOff) player.release()
         }
     }
     LaunchedEffect(preview) { previewRetry = 0 }
@@ -165,7 +171,14 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
 
     fun watch(list: List<ChannelEntity>, index: Int) {
         val p = playlist ?: return
-        // El traspaso del reproductor sin recargar (`PlayerFactory.handOff`) llega con el reproductor móvil (fase 4).
+        val ch = list[index]
+        // Si la previsualización ya muestra ese canal, su reproductor pasa a pantalla completa sin recargar.
+        if (settings.externalPlayerPackage.isBlank() && preview?.streamId == ch.streamId &&
+            PlayerFactory.isLoaded(player, graph.streams.live(p, ch).url)
+        ) {
+            handedOff = true
+            graph.players.handOff(player)
+        }
         graph.playChannels(context, nav, p, list, index)
     }
     fun tapChannel(list: List<ChannelEntity>, index: Int) {
