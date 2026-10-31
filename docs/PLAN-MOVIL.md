@@ -144,6 +144,11 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 
 ### Fase 2 — Esqueleto móvil (2–3 días)
 
+**Hecha (31 oct 2026).** Cambios respecto a lo previsto:
+- En lugar de `NavigationSuiteScaffold` y `WindowSizeClass` (dos dependencias más, una experimental) se usa `WidthClass`, con los mismos cortes (600/840 dp) calculados con el ancho de ventana, y una barra inferior o un raíl de Material 3. El `NavHost` no cambia de posición al girar, así que las pantallas conservan su estado.
+- `AdaptivePanes` no hace falta como pieza aparte: cada pantalla elige su maquetación con `LocalWidthClass`.
+- Las pantallas de las fases 3–5 muestran «En construcción» con la fase en que llegan; tocar «Sigue viendo» o un favorito abre el aviso del reproductor (fase 4).
+
 - `MobileActivity` (sin orientación fija, `configChanges` para rotar sin recrear, `enableEdgeToEdge`, `ensureVpnPermission` equivalente).
 - `MobileRoot`: `NavHost` con las mismas `Routes` y `NavigationSuiteScaffold` (barra inferior en vertical, raíl en horizontal) según `WindowSizeClass`; barra superior (píldora VPN, buscar, ajustes).
 - Utilidad `AdaptivePanes` (una columna / dos paneles) que usan todas las pantallas.

@@ -31,7 +31,7 @@ El módulo `:app` tiene dos sabores (`productFlavors`, dimensión `device`):
 
 - `src/main` — núcleo compartido: todo lo de abajo salvo la UI, más los tokens del tema (`ui/theme/Theme.kt`), las rutas (`ui/navigation`) y los ViewModels (`LiveViewModel`, `VodViewModels`).
 - `src/tv` — `MainActivity` y la UI de Compose for TV (`ui/components`, `ui/screens`, `LumenRoot`, `Launch.kt`, `LumenTheme`). `applicationId` `app.lumentv`.
-- `src/mobile` — `MobileActivity` y la UI táctil con Material 3 (en desarrollo, `docs/PLAN-MOVIL.md`). `applicationId` `app.lumentv.mobile`.
+- `src/mobile` — `MobileActivity` y la UI táctil con Material 3 (en desarrollo, `docs/PLAN-MOVIL.md`; diseño en `DESIGN-MOBILE.md`). `MobileRoot` (NavHost + barra inferior o raíl según `ui/adaptive/WidthClass`), `ui/components` (táctiles: `TapSurface`, hojas, campos) y `ui/screens`. `applicationId` `app.lumentv.mobile`.
 
 Los paquetes Kotlin son los mismos en los tres; lo de abajo cuelga de `app/src/<sabor>/java/app/lumentv/`.
 
