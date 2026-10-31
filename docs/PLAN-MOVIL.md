@@ -112,6 +112,8 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 
 ### Fase 0 — Preparar el proyecto (½–1 día)
 
+**Hecha (31 oct 2026).** Sabores `tv`/`mobile`, UI de TV movida a `src/tv`, tema partido (tokens en `main`, `LumenTheme` por sabor), `MobileActivity` provisional, OTA desactivada en `mobile`, `release.yml` publica solo el sabor `tv` y nuevo `build.yml` compila los dos en cada push.
+
 - Añadir `flavorDimensions("device")` con `tv` y `mobile` en `app/build.gradle.kts`; mover `ui/` actual, `MainActivity`, banner y manifiesto de TV a `src/tv`.
 - Mover ViewModels y tema a `src/main`; `AppGraph` no cambia.
 - `mobile`: `minSdk 26`, `targetSdk 35` (exige *edge-to-edge*), dependencias `compose-material3` (solo en `mobileImplementation`) para `NavigationBar`, `ModalBottomSheet`, `TextField`, `Switch`.

@@ -139,15 +139,16 @@ cp .env.example .env
 ```
 
 ```bash
-./gradlew assembleRelease
+./gradlew assembleTvRelease
 ```
 
-El APK queda en `app/build/outputs/apk/release/app-release.apk`. Sin keystore configurado se firma con la clave debug (vale para probar, no para actualizar).
+El APK queda en `app/build/outputs/apk/tv/release/app-tv-release.apk`. Sin keystore configurado se firma con la clave debug (vale para probar, no para actualizar).
 
 Comandos útiles:
 
 ```bash
-./gradlew assembleDebug testDebugUnitTest
+./gradlew assembleTvDebug testTvDebugUnitTest
+./gradlew assembleMobileDebug   # versión móvil (en desarrollo, ver docs/PLAN-MOVIL.md)
 ```
 
 Para probar sin tu lista real hay un panel Xtream de demostración en [`tools/mock-xtream/`](tools/mock-xtream/README.md).
