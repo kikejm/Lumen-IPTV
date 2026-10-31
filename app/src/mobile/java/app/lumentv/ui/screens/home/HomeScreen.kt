@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.lumentv.core.util.TimeFormatter
 import app.lumentv.core.util.relativeAge
@@ -67,6 +68,8 @@ import app.lumentv.ui.components.TopBar
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
+import app.lumentv.ui.playChannels
+import app.lumentv.ui.resume
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import app.lumentv.vpn.VpnState
@@ -86,13 +89,13 @@ private data class Tile(val label: String, val caption: String, val icon: ImageV
 
 /**
  * Inicio (Stitch 01-inicio / L01-inicio / T01-inicio): «Sigue viendo», accesos, favoritos y pie
- * con el estado de la lista. Datos reales de Room; reproducir llega en la fase 4, así que de
- * momento las tarjetas abren el aviso del reproductor.
+ * con el estado de la lista. Datos reales de Room; las tarjetas reanudan como en la TV.
  */
 @Composable
 fun HomeScreen(nav: Navigator, insets: PaddingValues) {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val widthClass = LocalWidthClass.current
     val playlist by graph.playlists.active.collectAsState(initial = null)
     val settings by graph.settings.settings.collectAsState()
@@ -131,7 +134,7 @@ fun HomeScreen(nav: Navigator, insets: PaddingValues) {
         Column {
             SectionTitle("Sigue viendo")
             if (last != null) {
-                ContinueCard(last, settings.use24h) { nav.go(Routes.PLAYER) }
+                ContinueCard(last, settings.use24h) { playlist?.let { p -> scope.launch { graph.resume(context, nav, p, last) } } }
             } else {
                 WelcomeCard(sync) { nav.replaceRoot(Routes.LIVE) }
             }
@@ -150,14 +153,14 @@ fun HomeScreen(nav: Navigator, insets: PaddingValues) {
             Column {
                 SectionTitle("Mis favoritos")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(rowChannels, key = { it.streamId }) { ch -> ChannelCard(ch.name, ch.logo) { nav.go(Routes.PLAYER) } }
+                    items(rowChannels, key = { it.streamId }) { ch -> ChannelCard(ch.name, ch.logo) { playlist?.let { p -> graph.playChannels(context, nav, p, rowChannels, rowChannels.indexOf(ch)) } } }
                 }
             }
         } else if (recentLive.isNotEmpty()) {
             Column {
                 SectionTitle("Vistos recientemente")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(recentLive, key = { it.itemId }) { h -> ChannelCard(h.title, h.image) { nav.go(Routes.PLAYER) } }
+                    items(recentLive, key = { it.itemId }) { h -> ChannelCard(h.title, h.image) { playlist?.let { p -> scope.launch { graph.resume(context, nav, p, h) } } } }
                 }
             }
         }

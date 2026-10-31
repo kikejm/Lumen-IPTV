@@ -54,6 +54,11 @@ import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.screens.home.HomeScreen
+import app.lumentv.ui.screens.live.LiveScreen
+import app.lumentv.ui.screens.vod.MovieDetailScreen
+import app.lumentv.ui.screens.vod.MoviesScreen
+import app.lumentv.ui.screens.vod.SeriesDetailScreen
+import app.lumentv.ui.screens.vod.SeriesScreen
 import app.lumentv.ui.screens.placeholder.ComingSoonScreen
 import app.lumentv.ui.screens.playlist.PlaylistEditScreen
 import app.lumentv.ui.theme.Lumen
@@ -109,14 +114,18 @@ private fun MobileNavHost(startOnboarding: Boolean) {
                 PlaylistEditScreen(nav, insets, it.arguments?.getString("id")?.toLongOrNull(), isOnboarding = false)
             }
             // Pantallas de las fases 3–5 del plan: de momento, un aviso.
-            composable(Routes.LIVE) { ComingSoonScreen(nav, insets, "TV en directo", phase = 3) }
-            composable(Routes.MOVIES) { ComingSoonScreen(nav, insets, "Cine", phase = 3) }
-            composable(Routes.SERIES) { ComingSoonScreen(nav, insets, "Series", phase = 3) }
+            composable(Routes.LIVE) { LiveScreen(nav, insets) }
+            composable(Routes.MOVIES) { MoviesScreen(nav, insets) }
+            composable(Routes.SERIES) { SeriesScreen(nav, insets) }
             composable(Routes.GUIDE) { ComingSoonScreen(nav, insets, "Guía", phase = 3) }
             composable(Routes.SEARCH) { ComingSoonScreen(nav, insets, "Buscar", phase = 3, detail = true) }
             composable(Routes.CATCHUP) { ComingSoonScreen(nav, insets, "Catch-up", phase = 3, detail = true) }
-            composable(Routes.MOVIE_DETAIL) { ComingSoonScreen(nav, insets, "Película", phase = 3, detail = true) }
-            composable(Routes.SERIES_DETAIL) { ComingSoonScreen(nav, insets, "Serie", phase = 3, detail = true) }
+            composable(Routes.MOVIE_DETAIL, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
+                MovieDetailScreen(nav, insets, it.arguments?.getString("id").orEmpty())
+            }
+            composable(Routes.SERIES_DETAIL, arguments = listOf(navArgument("id") { type = NavType.StringType })) {
+                SeriesDetailScreen(nav, insets, it.arguments?.getString("id").orEmpty())
+            }
             composable(Routes.PLAYER) { ComingSoonScreen(nav, insets, "Reproductor", phase = 4, detail = true) }
             composable(Routes.MULTIVIEW) { ComingSoonScreen(nav, insets, "Multipantalla", phase = 5, detail = true) }
             composable(Routes.VPN) { ComingSoonScreen(nav, insets, "VPN", phase = 5, detail = true) }
