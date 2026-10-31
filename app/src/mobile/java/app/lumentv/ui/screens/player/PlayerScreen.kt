@@ -530,7 +530,7 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
         else -> Column(Modifier.fillMaxSize().background(c.background).padding(insets)) {
             Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
                 video(Modifier.fillMaxSize())
-                AnimatedVisibility(visible = overlay && error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+                androidx.compose.animation.AnimatedVisibility(visible = overlay && error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
                     PortraitVideoControls(
                         isLive = isLive, isPlaying = isPlaying, position = position, duration = duration,
                         onBack = ::leave, onTogglePlay = ::togglePlay, onSeek = { player.seekTo(it); showOverlay() },
