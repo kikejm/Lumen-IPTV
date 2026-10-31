@@ -65,7 +65,22 @@ Pantallas verticales generadas en Stitch (`design/stitch-mobile/`):
 9. `09-alta-lista` — alta Xtream/M3U (onboarding).
 10. `10-opciones` — hoja inferior de opciones de canal (sustituye a ☰).
 
-Pendientes de diseñar en Stitch en la fase 1: ficha de película, búsqueda, multipantalla (2 vídeos en horizontal), PIN parental, catch-up, test de velocidad, estados vacíos/errores y la variante tableta (las horizontales de las 10 pantallas ya están: ver «Vertical y horizontal»).
+Añadidas en la fase 1:
+
+11. `11-ficha-pelicula` — arte, metadatos, reanudar, reparto y «Te puede gustar».
+12. `12-busqueda` — búsqueda con filtros (canales, películas, series, programas) y recientes.
+13. `13-pin-parental` — hoja con teclado numérico propio.
+14. `14-catchup` — días y programas emitidos de un canal.
+15. `15-test-velocidad` — medidor, latencia y recomendación de búfer.
+16. `16-vacios` — estado vacío («Tu lista está vacía»).
+17. `17-sin-lista` — error de conexión con el proveedor (Reintentar · Conectar VPN · Editar lista).
+18. `18-reproductor-vertical` — vídeo arriba, canal, EPG y canales para zapear.
+19. `19-reconectando` — reproductor reintentando (píldora «vuelve a conectar en 3 s (1/5)»).
+20. `20-mini-reproductor` — mini reproductor sobre la barra inferior.
+- Horizontal: `L11-multipantalla` (dos vídeos, audio en el tocado) y `L19-error-reproductor` (agotados los reintentos).
+- Tableta (*Expanded*): `T01-inicio`, `T02-directo` (tres paneles) y `T04-cine` (8 columnas).
+
+La referencia normativa del diseño móvil es **`DESIGN-MOBILE.md`** (raíz del repo).
 
 Correcciones ya aplicadas en Stitch tras revisar la primera generación (`edit_screens`): nombre «IPTV» en una línea (salía «IPTV Stream»), acceso «VPN» en lugar de «Seguridad», fuera las píldoras «EN DIRECTO/LIVE» (las prohíbe DESIGN.md) y el reproductor rehecho en horizontal de móvil (~2,2:1). Stitch no tiene Alan Sans: en código se usa la fuente empaquetada (`res/font`). El DESIGN.md subido a Stitch está en `design/stitch-mobile/DESIGN.md`.
 
@@ -122,8 +137,10 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 
 ### Fase 1 — Diseño cerrado en Stitch (1–2 días)
 
+**Hecha (31 oct 2026).** 15 pantallas nuevas (vertical, horizontal y tableta) y `DESIGN-MOBILE.md`. En la revisión se corrigieron en Stitch: etiquetas rojas «DIRECTO» y barras rojas en las dos Guías (ahora azul, solo la línea de la hora en rojo), el texto de «grabar», el botón de descarga de las fichas de serie (no hay descargas) y el fondo de la ficha de película (llevaba interfaz incrustada).
+
 - Generar las pantallas pendientes (ficha de película, búsqueda, multipantalla, PIN, catch-up, estados vacíos, tableta) y revisarlas en Stitch.
-- Exportar capturas a `design/stitch-mobile/` y escribir `DESIGN-MOBILE.md` (tokens compartidos, reglas táctiles y la tabla vertical/horizontal).
+- Exportar capturas a `design/stitch-mobile/` y escribir `DESIGN-MOBILE.md` (tokens compartidos, reglas táctiles y la tabla vertical/horizontal/tableta).
 
 ### Fase 2 — Esqueleto móvil (2–3 días)
 
