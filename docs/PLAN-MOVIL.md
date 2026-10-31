@@ -104,7 +104,7 @@ Así el mismo código sirve también para tabletas y plegables, y para la multiv
 - Estado de pantalla (pestaña, categoría, scroll) en `rememberSaveable`/ViewModel, por si el sistema recrea la Activity igualmente (multiventana, cambio de tema).
 - El `ExoPlayer` vive fuera de la composición (como ya hace `PlayerFactory.handOff`); el `VideoSurface` se recoloca entre la previsualización y la pantalla completa sin `prepare()` nuevo.
 - Teclado en horizontal: `windowSoftInputMode="adjustResize"` y formularios desplazables (en horizontal el teclado tapa media pantalla).
-- Probar cada pantalla en los dos sentidos y en un emulador de tableta; Compose Preview con `@PreviewScreenSizes`.
+- Probar cada pantalla en los dos sentidos y en un emulador de tableta (la tableta entra en la primera versión); Compose Preview con `@PreviewScreenSizes`.
 
 Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` … `L10-opciones` (mismo número que su versión vertical).
 
@@ -142,9 +142,8 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 - Vertical: vídeo 16:9 arriba + información debajo. Horizontal: pantalla completa con barras del sistema ocultas. Girar el móvil cambia de modo sin cortar el vídeo; botón de pantalla completa que fuerza horizontal (`SCREEN_ORIENTATION_SENSOR_LANDSCAPE`) y lo libera al salir.
 - Gestos (brillo, volumen, doble toque, zapping), bloqueo de pantalla, relación de aspecto, pistas de audio/subtítulos.
 - Reconexión automática igual que en TV (5 intentos, 3 s).
-- `MediaSessionService` de Media3: controles en notificación y pantalla de bloqueo, audio con la pantalla apagada (opcional en Ajustes).
+- *(Aplazado, ver «Decisiones tomadas»)* `MediaSessionService` de Media3: controles en notificación y pantalla de bloqueo, audio con la pantalla apagada.
 - PiP automático (`setAutoEnterEnabled` en Android 12+) y mini reproductor interno.
-- Permiso `POST_NOTIFICATIONS` (Android 13+).
 
 ### Fase 5 — VPN, ajustes y extras (2–3 días)
 
@@ -170,9 +169,9 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 - **Tráfico HTTP en claro**: muchos proveedores IPTV usan `http://`; se mantiene `usesCleartextTraffic`.
 - **Base de datos**: no hay cambio de esquema previsto; si lo hubiera, `Migration` obligatoria (regla de CLAUDE.md).
 
-## Decisiones abiertas (para confirmar)
+## Decisiones tomadas (31 oct 2026)
 
-1. ¿Paquete distinto para el móvil (`app.lumentv.mobile`, recomendado) o el mismo?
-2. ¿Audio en segundo plano y controles en la pantalla de bloqueo desde la primera versión?
-3. ¿Chromecast? Requiere Google Play Services en el móvil (sí lo tiene) y añade dependencia; propuesto para después de la paridad.
-4. Tableta: con `WindowSizeClass` sale casi gratis; ¿se prueba y se da por soportada en la primera versión?
+1. **Dos apps separadas**: el móvil usa el paquete `app.lumentv.mobile`; la TV sigue en `app.lumentv`. Mismo keystore.
+2. **Audio en segundo plano y controles en la pantalla de bloqueo: más adelante.** La primera versión no incluye `MediaSessionService` ni audio con la pantalla apagada; se añade después de la paridad sin rehacer nada.
+3. **Chromecast: más adelante.**
+4. **Tableta incluida en la primera versión**: se prueba en un emulador de tableta (clase *Expanded*) y se da por soportada (~1 día).
