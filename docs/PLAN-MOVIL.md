@@ -157,6 +157,8 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 
 ### Fase 3 — Contenido (4–6 días)
 
+**Hecha (31 oct 2026).** TV en directo (previsualización con `claimStream`, chips de categoría y calidad, EPG; 1/2/3 paneles), Cine y Series (hero, chips, rejilla de 3/6/8–10 columnas, Mi lista, Recientes), fichas de película y serie, Guía (columna fija, desplazamiento horizontal compartido, ~1/2,5/3 h visibles), búsqueda y catch-up (por día; se abre con el canal elegido desde Directo). Pendiente para la fase 4: al abrir a pantalla completa el canal de la previsualización todavía no se traspasa su reproductor (`PlayerFactory.handOff`), porque el reproductor móvil aún no existe; hoy se abre el aviso «En construcción».
+
 - TV en directo: previsualización fija + lista (respetando `PlayerFactory.claimStream`/`handOff`: una sola conexión por cuenta).
 - Cine y Series: rejilla `LazyVerticalGrid(GridCells.Adaptive(100.dp))` (3 columnas en vertical, 6 en horizontal, más en tableta), fichas, Mi lista, Recientes.
 - Guía EPG táctil (scroll en dos ejes sincronizado), búsqueda, favoritos, catch-up.
