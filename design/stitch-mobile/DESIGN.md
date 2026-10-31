@@ -26,7 +26,7 @@ spacing: {gutter: 16px, section: 24px, touch-min: 48px}
 
 # IPTV — versión móvil Android
 
-Versión para teléfono Android (vertical 360×800 dp, y horizontal solo en el reproductor) de una app IPTV personal con VPN WireGuard integrada (Proton). Es la misma app que la de Fire TV: mismos datos, mismas funciones, misma identidad visual (inspirada en la app Apple TV / tvOS), pero adaptada a pantalla táctil y a una mano.
+Versión para teléfono Android, en vertical (360×800 dp) y en horizontal (800×360 dp) en todas las pantallas de una app IPTV personal con VPN WireGuard integrada (Proton). Es la misma app que la de Fire TV: mismos datos, mismas funciones, misma identidad visual (inspirada en la app Apple TV / tvOS), pero adaptada a pantalla táctil y a una mano.
 
 ## Overview
 - El contenido manda: fondo negro puro, carátulas y logos generosos, cromo mínimo.
@@ -41,7 +41,7 @@ Superficies en tres niveles: surface (tarjetas), surface-elevated (campos, selec
 Alan Sans: 800 para títulos, 400 para el resto. Nada por debajo de 11 sp. Cuerpo 15 sp.
 
 ## Layout
-- Barra de navegación inferior con 5 destinos: Inicio · Directo · Cine · Series · Guía. Arriba, barra con título grande, píldora de estado VPN (punto verde/naranja/gris + texto), lupa de búsqueda y engranaje de ajustes.
+- Vertical: barra de navegación inferior con 5 destinos (en horizontal, raíl lateral de 72 dp con los mismos destinos): Inicio · Directo · Cine · Series · Guía. Arriba, barra con título grande, píldora de estado VPN (punto verde/naranja/gris + texto), lupa de búsqueda y engranaje de ajustes.
 - Márgenes laterales de 16 dp. Objetivos táctiles de al menos 48 dp.
 - El foco con anillo y escala de la TV se sustituye por estado pulsado (superficie aclarada) y ripple sutil.
 - Menú contextual (☰ en la TV) = pulsación larga → hoja inferior (bottom sheet) con opciones.
