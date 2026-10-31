@@ -1,64 +1,64 @@
 package app.lumentv
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import app.lumentv.di.AppGraph
-import app.lumentv.ui.theme.Lumen
-import app.lumentv.ui.theme.LumenTheme
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
+import app.lumentv.ui.MobileRoot
+import kotlinx.coroutines.launch
 
 /**
- * Activity de la versión móvil. Fase 0 del plan (docs/PLAN-MOVIL.md): solo comprueba que el
- * núcleo compartido (AppGraph, Room, ajustes) arranca en el teléfono. La UI llega en la fase 2.
+ * Única Activity de la versión móvil. Sin orientación fija (vertical y horizontal) y con
+ * `configChanges` en el manifiesto: girar no la recrea, Compose recompone con el nuevo tamaño.
+ * Dibuja de borde a borde con las barras del sistema siempre claras sobre fondo negro.
  */
 class MobileActivity : ComponentActivity() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
-        super.onCreate(savedInstanceState)
-        setContent { LumenTheme { PlaceholderScreen(graph) } }
+    private var vpnPermissionCallback: ((Boolean) -> Unit)? = null
+    private val vpnPermissionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val granted = graph.vpn.permissionIntent() == null
+        vpnPermissionCallback?.invoke(granted)
+        vpnPermissionCallback = null
     }
-}
 
-@Composable
-private fun PlaceholderScreen(graph: AppGraph) {
-    val playlist by graph.playlists.active.collectAsState(initial = null)
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Lumen.colors.background)
-            .safeDrawingPadding()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("IPTV", style = Lumen.type.largeTitle, color = Lumen.colors.textPrimary)
-        Text(
-            "Versión móvil en construcción",
-            style = Lumen.type.body,
-            color = Lumen.colors.textSecondary,
-            textAlign = TextAlign.Center,
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
-        Text(
-            playlist?.let { "Lista activa: ${it.name}" } ?: "Sin lista configurada",
-            style = Lumen.type.callout,
-            color = Lumen.colors.textTertiary,
-            textAlign = TextAlign.Center,
-        )
+        super.onCreate(savedInstanceState)
+        setContent { MobileRoot(graph) }
+        if (savedInstanceState == null) autoConnectVpn()
+    }
+
+    /** Pide (una sola vez) el permiso de VPN de Android y devuelve si está concedido. */
+    fun ensureVpnPermission(callback: (Boolean) -> Unit) {
+        val intent = graph.vpn.permissionIntent()
+        if (intent == null) {
+            callback(true)
+            return
+        }
+        vpnPermissionCallback = callback
+        runCatching { vpnPermissionLauncher.launch(intent) }.onFailure { callback(false) }
+    }
+
+    private fun autoConnectVpn() {
+        lifecycleScope.launch {
+            val s = graph.settings.load()
+            if (s.vpnAutoConnect && !graph.vpn.isConnected && graph.vpnServers.all().isNotEmpty()) {
+                ensureVpnPermission { ok -> if (ok) lifecycleScope.launch { graph.vpn.quickConnect() } }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        if (isFinishing && graph.settings.current.vpnDisconnectOnExit && graph.vpn.isConnected) {
+            graph.appScope.launch { graph.vpn.disconnect() }
+        }
+        super.onDestroy()
     }
 }
