@@ -39,7 +39,7 @@ export JAVA_HOME="$LOCALAPPDATA/Programs/jdk-17.0.20.1+1"; export PATH="$JAVA_HO
 - **Base de datos**: `fallbackToDestructiveMigration` está activo porque el catálogo es caché, pero `playlists`, `vpn_servers`, `favorites` e `history` son datos del usuario. IMPORTANT: si cambias el esquema, sube `version` **y escribe una `Migration`** que preserve esas tablas.
 - Inyección de dependencias manual en `di/AppGraph.kt`. No añadas Hilt/Koin.
 - Versiones de librerías solo en `gradle/libs.versions.toml`.
-- **Icono y banner en `res/drawable-*` (PNG), nunca en `mipmap` ni adaptativos**: el lanzador de Fire OS 7/8 no encuentra iconos `mipmap` de apps instaladas fuera de la tienda y muestra una imagen rota. Si cambias el icono, sube `lumen.versionCode`: Fire TV guarda en caché el icono anterior (a veces hace falta reiniciar el Fire TV).
+- **Icono y banner en `res/drawable-*` (PNG), nunca en `mipmap` ni adaptativos**: el lanzador de Fire OS 7/8 no encuentra iconos `mipmap` de apps instaladas fuera de la tienda y muestra una imagen rota. Si cambias el icono, sube `lumen.versionCode`: Fire TV guarda en caché el icono anterior. El menú de Fire TV pinta `ic_launcher` en un cuadrado sobre el rectángulo gris e ignora `android:banner`: el icono debe ser cuadrado (uno 16:9 sale aplastado). Tras `adb install -r` sale la imagen rota (unos 15 s después) hasta reiniciar: espera a que salga y lanza entonces `adb reboot`, porque si reinicias antes el menú conserva el icono anterior. El nuevo aparece más o menos minuto y medio tras reiniciar; el lanzador no se puede cerrar por ADB.
 
 ## VPN (lo más delicado)
 
