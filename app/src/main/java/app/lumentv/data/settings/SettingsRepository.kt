@@ -32,7 +32,6 @@ data class AppSettings(
     val resizeMode: ResizeMode = ResizeMode.FIT,
     val externalPlayerPackage: String = "",
     val autoRefreshHours: Int = 24,
-    val pipEnabled: Boolean = true,
     val vpnAutoConnect: Boolean = false,
     val vpnDisconnectOnExit: Boolean = true,
     val vpnAppOnly: Boolean = true,
@@ -80,7 +79,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setResizeMode(v: ResizeMode) = update { it[K.resize] = v.name }
     suspend fun setExternalPlayer(pkg: String) = update { it[K.externalPlayer] = pkg }
     suspend fun setAutoRefreshHours(v: Int) = update { it[K.autoRefresh] = v }
-    suspend fun setPipEnabled(v: Boolean) = update { it[K.pip] = v }
     suspend fun setVpnAutoConnect(v: Boolean) = update { it[K.vpnAuto] = v }
     suspend fun setVpnDisconnectOnExit(v: Boolean) = update { it[K.vpnDisconnectOnExit] = v }
     suspend fun setVpnAppOnly(v: Boolean) = update { it[K.vpnAppOnly] = v }
@@ -102,7 +100,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         resizeMode = enumOr(this[K.resize], ResizeMode.FIT),
         externalPlayerPackage = this[K.externalPlayer] ?: "",
         autoRefreshHours = this[K.autoRefresh] ?: 24,
-        pipEnabled = this[K.pip] ?: true,
         vpnAutoConnect = this[K.vpnAuto] ?: false,
         vpnDisconnectOnExit = this[K.vpnDisconnectOnExit] ?: true,
         vpnAppOnly = this[K.vpnAppOnly] ?: true,
@@ -128,7 +125,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val resize = stringPreferencesKey("resize_mode")
         val externalPlayer = stringPreferencesKey("external_player")
         val autoRefresh = intPreferencesKey("auto_refresh_hours")
-        val pip = booleanPreferencesKey("pip")
         val vpnAuto = booleanPreferencesKey("vpn_auto_connect")
         val vpnDisconnectOnExit = booleanPreferencesKey("vpn_disconnect_on_exit")
         val vpnAppOnly = booleanPreferencesKey("vpn_app_only")

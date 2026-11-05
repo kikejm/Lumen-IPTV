@@ -71,8 +71,8 @@ class PlayerFactory(private val context: Context, private val http: OkHttpClient
     private val releaseUnclaimed = Runnable { handedOff?.release(); handedOff = null }
 
     /**
-     * La previsualización de TV en directo entrega su reproductor a pantalla completa para que el
-     * canal siga sin recargarse. Si nadie lo recoge enseguida (p. ej. se abrió un reproductor externo), se libera.
+     * El reproductor a pantalla completa (al que se llega con «Reanudar» desde Inicio) entrega el suyo a la
+     * previsualización de TV en directo para que el canal siga sin recargarse. Si nadie lo recoge enseguida, se libera.
      */
     fun handOff(player: ExoPlayer) {
         main.removeCallbacks(releaseUnclaimed)

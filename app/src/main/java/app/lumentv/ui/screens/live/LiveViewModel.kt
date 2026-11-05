@@ -9,6 +9,7 @@ import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.PlaylistEntity
 import app.lumentv.data.epg.Program
+import app.lumentv.data.library.LibraryRepository
 import app.lumentv.di.AppGraph
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -71,7 +72,7 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
             when (cat) {
                 CAT_ALL -> graph.catalog.channels(p.id, null)
                 CAT_FAVORITES -> favoriteIds.mapLatest { ids -> graph.catalog.channelsByIds(p.id, ids.toList()).sortedBy { it.sortOrder } }
-                CAT_RECENT -> graph.library.history(p.id, ContentKind.LIVE, 50).mapLatest { h ->
+                CAT_RECENT -> graph.library.history(p.id, ContentKind.LIVE, LibraryRepository.MAX_LIVE_HISTORY).mapLatest { h ->
                     val byId = graph.catalog.channelsByIds(p.id, h.map { it.itemId }).associateBy { it.streamId }
                     h.mapNotNull { byId[it.itemId] }
                 }
@@ -125,10 +126,16 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
 
     /**
      * Al volver de pantalla completa: enfoca el canal que sonaba y, si llega su reproductor ([playing]),
-     * lo previsualiza. Si la pantalla es nueva («Reanudar» desde Inicio) abre además la categoría del canal.
+     * lo previsualiza. Si la lista a la vista no lo contiene (se estaba mirando otra categoría, o la pantalla
+     * es nueva por «Reanudar» desde Inicio) abre la categoría del canal, sin filtro de calidad si lo ocultaría.
      */
     fun returnTo(ch: ChannelEntity, playing: Boolean) {
-        if (focusedChannel.value == null && !isCategoryLocked(ch.categoryId)) selectedCategory.value = ch.categoryId
+        val page = channelPage.value
+        val inView = page.categoryId == selectedCategory.value && page.channels.any { it.streamId == ch.streamId }
+        if (!inView && !isCategoryLocked(ch.categoryId)) {
+            selectedCategory.value = ch.categoryId
+            if (!ChannelQuality.matches(ch.name, graph.settings.current.liveQuality)) setQuality(QualityFilter.ALL)
+        }
         focusedChannel.value = ch
         if (playing) _previewChannel.value = ch
     }

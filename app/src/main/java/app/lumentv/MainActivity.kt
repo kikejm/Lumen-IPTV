@@ -1,32 +1,18 @@
 package app.lumentv
 
-import android.app.PictureInPictureParams
-import android.content.pm.PackageManager
-import android.content.res.Configuration
-import android.os.Build
+import android.content.Intent
 import android.os.Bundle
-import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import app.lumentv.ui.LumenRoot
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-    /** Lo activa PlayerScreen para permitir PiP al pulsar Inicio durante la reproducción. */
-    var playerActive: Boolean = false
-
-    var isInPip by mutableStateOf(false)
-        private set
-
-    val supportsPip: Boolean
-        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+    /** La propia app está abriendo otra pantalla (permiso de VPN, reproductor externo, tráiler…): no es salir de ella. */
+    private var openingOtherActivity = false
 
     private var vpnPermissionCallback: ((Boolean) -> Unit)? = null
     private val vpnPermissionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -61,21 +47,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun enterPip() {
-        if (!supportsPip || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        runCatching {
-            enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())
+    /** Toda apertura de actividades desde esta Activity (`startActivity` incluido) pasa por aquí. */
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        openingOtherActivity = true
+        try {
+            super.startActivityForResult(intent, requestCode, options)
+        } catch (e: RuntimeException) {
+            openingOtherActivity = false
+            throw e
         }
     }
 
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        if (playerActive && graph.settings.current.pipEnabled) enterPip()
+    override fun onResume() {
+        super.onResume()
+        openingOtherActivity = false
+        graph.updater.openedSystemScreen = false
     }
 
-    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        isInPip = isInPictureInPictureMode
+    /** El usuario se va al menú del Fire TV con la tecla Inicio: la app se cierra, igual que al salir con Atrás. */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (!openingOtherActivity && !graph.updater.openedSystemScreen) finish()
     }
 
     override fun onDestroy() {

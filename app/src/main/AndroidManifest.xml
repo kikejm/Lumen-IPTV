@@ -10,7 +10,6 @@
     <!-- Fire TV: sin pantalla táctil, con mando (leanback). -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
-    <uses-feature android:name="android.software.picture_in_picture" android:required="false" />
 
     <application
         android:name=".LumenApp"
@@ -32,7 +31,6 @@
             android:launchMode="singleTask"
             android:resizeableActivity="true"
             android:screenOrientation="landscape"
-            android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

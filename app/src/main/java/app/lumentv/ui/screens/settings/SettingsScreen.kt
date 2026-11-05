@@ -250,9 +250,6 @@ private fun PlayerSection() {
             val idx = EXTERNAL_PLAYERS.indexOfFirst { it.first == s.externalPlayerPackage }
             scope.launch { graph.settings.setExternalPlayer(EXTERNAL_PLAYERS[(idx + 1) % EXTERNAL_PLAYERS.size].first) }
         }
-        SettingRow("Imagen en imagen (PiP)", onOff(s.pipEnabled), "Al pulsar Inicio durante la reproducción (si el Fire TV lo soporta)") {
-            scope.launch { graph.settings.setPipEnabled(!s.pipEnabled) }
-        }
         SettingRow("User-Agent", s.userAgent, "Algunos proveedores solo aceptan ciertos User-Agent") { editUa = true }
     }
     if (editUa) {

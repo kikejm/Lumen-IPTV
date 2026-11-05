@@ -27,7 +27,6 @@ import androidx.compose.material.icons.rounded.ClosedCaptionDisabled
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PictureInPicture
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -61,8 +60,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.tv.material3.Icon
-import app.lumentv.MainActivity
 import app.lumentv.core.util.TimeFormatter
 import app.lumentv.core.util.formatDuration
 import app.lumentv.data.db.ContentKind
@@ -93,11 +92,16 @@ private const val MAX_RETRIES = 5
 private const val RETRY_SECONDS = 3
 private const val STALL_TIMEOUT_MS = 20_000L
 
+/**
+ * Reproductor dentro de otra pantalla (TV en directo): esa pantalla aporta el reproductor y el vídeo, que amplía
+ * ella misma para no cambiar de `SurfaceView`; aquí solo van los controles, sobre un fondo transparente.
+ */
+class EmbeddedPlayer(val player: ExoPlayer, val onExit: () -> Unit, val onResizeChange: (ResizeMode) -> Unit)
+
 @Composable
-fun PlayerScreen(nav: Navigator) {
+fun PlayerScreen(nav: Navigator, embedded: EmbeddedPlayer? = null) {
     val graph = LocalGraph.current
     val context = LocalContext.current
-    val activity = context as? MainActivity
     val scope = rememberCoroutineScope()
     val session = graph.playback
     val settings by graph.settings.settings.collectAsState()
@@ -109,7 +113,7 @@ fun PlayerScreen(nav: Navigator) {
     var overlay by remember { mutableStateOf(true) }
     var overlayTick by remember { mutableIntStateOf(0) }
     var isPlaying by remember { mutableStateOf(false) }
-    var buffering by remember { mutableStateOf(true) }
+    var buffering by remember { mutableStateOf(embedded?.player?.playbackState != Player.STATE_READY) }
     var error by remember { mutableStateOf<String?>(null) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
@@ -118,11 +122,9 @@ fun PlayerScreen(nav: Navigator) {
     var showMenu by remember { mutableStateOf(false) }
     var resize by remember { mutableStateOf(settings.resizeMode) }
     var retries by remember { mutableIntStateOf(0) }
-    val inPip = activity?.isInPip ?: false
     val focus = remember { FocusRequester() }
 
-    // Desde la previsualización de TV en directo llega su reproductor con el canal ya cargado.
-    val player = remember { graph.players.takeHandOff() ?: graph.players.create() }
+    val player = remember { embedded?.player ?: graph.players.create() }
     var handedBack by remember { mutableStateOf(false) }
 
     // Última posición y duración válidas del elemento actual. Tras un error ExoPlayer pierde la duración:
@@ -166,7 +168,7 @@ fun PlayerScreen(nav: Navigator) {
         }
     }
 
-    /** `reuse`: si el reproductor ya tiene ese stream abierto (traspaso desde la previsualización), sigue sin recargar. */
+    /** `reuse`: si el reproductor ya tiene ese stream abierto (reproductor de la previsualización), sigue sin recargar. */
     fun load(target: PlayItem?, reuse: Boolean = false) {
         target ?: return
         if (target.itemId != item?.itemId || target.kind != item?.kind) {
@@ -262,16 +264,14 @@ fun PlayerScreen(nav: Navigator) {
             override fun onTracksChanged(t: Tracks) { tracks = t }
         }
         player.addListener(listener)
-        activity?.playerActive = true
-        // Un reproductor traspasado ya está reproduciendo: sus eventos de estado no se repetirán.
+        // El reproductor de la previsualización ya está reproduciendo: sus eventos de estado no se repetirán.
         buffering = player.playbackState != Player.STATE_READY
         isPlaying = player.isPlaying
         load(item, reuse = true)
         onDispose {
             item?.let { saveHistory(it) }
-            activity?.playerActive = false
             player.removeListener(listener)
-            if (!handedBack) player.release()
+            if (!handedBack && embedded == null) player.release()
         }
     }
 
@@ -304,7 +304,8 @@ fun PlayerScreen(nav: Navigator) {
         if (error != null) runCatching { errorFocus.requestFocus() } else runCatching { focus.requestFocus() }
     }
 
-    BackHandler(enabled = overlay && error == null) { overlay = false }
+    // Dentro de otra pantalla, Atrás reduce a la primera: ampliar y reducir seguidos no pasa por ocultar la información.
+    BackHandler(enabled = embedded == null && overlay && error == null) { overlay = false }
 
     fun showOverlay() { overlay = true; overlayTick++ }
     val isLive = item?.kind == ContentKind.LIVE && item?.subtitle?.startsWith("Catch-up") != true
@@ -322,12 +323,16 @@ fun PlayerScreen(nav: Navigator) {
     // Se entrega antes de salir porque la pantalla de destino se compone antes de que esta se cierre.
     // La pantalla a la que se vuelve enfoca lo que sonaba (el canal tras hacer zapping, el episodio tras el auto-siguiente).
     fun exit() {
+        if (embedded != null) {
+            embedded.onExit()
+            return
+        }
         item?.let { graph.playback.setReturnFocus(nav.previousRoute, it.itemId) }
         nav.back()
     }
 
-    BackHandler(enabled = !(overlay && error == null)) {
-        if (isLive && error == null && item?.channel != null && nav.previousRoute == Routes.LIVE) {
+    BackHandler(enabled = embedded != null || !(overlay && error == null)) {
+        if (embedded == null && isLive && error == null && item?.channel != null && nav.previousRoute == Routes.LIVE) {
             handedBack = true
             graph.players.handOff(player)
         }
@@ -337,7 +342,7 @@ fun PlayerScreen(nav: Navigator) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(if (embedded != null) Color.Transparent else Color.Black)
             .focusRequester(focus)
             .focusable()
             .onKeyEvent { e ->
@@ -358,7 +363,7 @@ fun PlayerScreen(nav: Navigator) {
                 }
             },
     ) {
-        VideoSurface(player, Modifier.fillMaxSize(), resize)
+        if (embedded == null) VideoSurface(player, Modifier.fillMaxSize(), resize)
 
         if ((buffering || retryIn > 0) && error == null) PlayerLoading(Modifier.align(Alignment.Center))
 
@@ -374,7 +379,7 @@ fun PlayerScreen(nav: Navigator) {
             }
         }
 
-        AnimatedVisibility(visible = overlay && !inPip && error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = overlay && error == null, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
                 // Degradados superior e inferior para legibilidad.
                 Box(Modifier.fillMaxWidth().fillMaxHeight(0.35f).align(Alignment.TopCenter).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent))))
@@ -459,7 +464,10 @@ fun PlayerScreen(nav: Navigator) {
                 }
             }
             ResizeMode.entries.forEach { mode ->
-                add(MenuOption("Imagen: ${mode.label}", Icons.Rounded.AspectRatio, mode == resize) { resize = mode })
+                add(MenuOption("Imagen: ${mode.label}", Icons.Rounded.AspectRatio, mode == resize) {
+                    resize = mode
+                    embedded?.onResizeChange?.invoke(mode)
+                })
             }
             item?.let { current ->
                 if (current.kind == ContentKind.LIVE || current.kind == ContentKind.VOD) {
@@ -476,9 +484,6 @@ fun PlayerScreen(nav: Navigator) {
                         )
                     }
                 })
-            }
-            if (activity?.supportsPip == true) {
-                add(MenuOption("Imagen en imagen (PiP)", Icons.Rounded.PictureInPicture) { activity.enterPip() })
             }
         }, onDismiss = { showMenu = false; runCatching { focus.requestFocus() } })
     }
