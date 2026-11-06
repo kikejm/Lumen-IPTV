@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.HistoryToggleOff
 import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -34,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,11 +57,15 @@ import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.HistoryEntity
 import app.lumentv.data.db.PlaylistEntity
+import app.lumentv.data.library.LibraryRepository
 import app.lumentv.ui.components.Artwork
 import app.lumentv.ui.components.Chip
 import app.lumentv.ui.components.FocusSurface
 import app.lumentv.ui.components.Gap
+import app.lumentv.ui.components.KeyHints
 import app.lumentv.ui.components.LText
+import app.lumentv.ui.components.MenuOption
+import app.lumentv.ui.components.OptionsDialog
 import app.lumentv.ui.components.PillButton
 import app.lumentv.ui.components.ProgressLine
 import app.lumentv.ui.components.SectionTitle
@@ -67,6 +73,7 @@ import app.lumentv.ui.components.TopBar
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
+import app.lumentv.ui.onMenuKey
 import app.lumentv.ui.playChannels
 import app.lumentv.ui.resume
 import app.lumentv.ui.theme.Lumen
@@ -99,6 +106,7 @@ fun HomeScreen(nav: Navigator) {
     }
 
     val firstTile = remember { FocusRequester() }
+    var historyMenu by remember { mutableStateOf<HistoryEntity?>(null) }
     val c = Lumen.colors
     val tiles = listOf(
         Tile("TV en directo", "$channelCount canales", Icons.Rounded.LiveTv, Color(0xFF0A84FF), Routes.LIVE),
@@ -164,7 +172,7 @@ fun HomeScreen(nav: Navigator) {
             }
 
             val rowChannels = favoriteChannels.value
-            val recentLive = history.filter { it.kind == ContentKind.LIVE }
+            val recentLive = history.filter { it.kind == ContentKind.LIVE }.take(LibraryRepository.MAX_LIVE_HISTORY)
             if (rowChannels.isNotEmpty() && playlist != null) item {
                 Column {
                     SectionTitle("Canales favoritos")
@@ -179,9 +187,10 @@ fun HomeScreen(nav: Navigator) {
                     SectionTitle("Vistos recientemente")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)) {
                         items(recentLive, key = { it.itemId }) { h ->
-                            HistoryCard(h) { scope.launch { playlist?.let { graph.resume(context, nav, it, h) } } }
+                            HistoryCard(h, onMenu = { historyMenu = h }) { scope.launch { playlist?.let { graph.resume(context, nav, it, h) } } }
                         }
                     }
+                    KeyHints("☰" to "Quitar del historial", modifier = Modifier.padding(start = 8.dp))
                 }
             }
 
@@ -189,6 +198,22 @@ fun HomeScreen(nav: Navigator) {
         }
     }
     LaunchedEffect(Unit) { runCatching { firstTile.requestFocus() } }
+
+    historyMenu?.let { h ->
+        OptionsDialog(
+            h.title,
+            listOf(
+                MenuOption("Quitar del historial", Icons.Rounded.HistoryToggleOff) {
+                    scope.launch {
+                        graph.library.removeHistory(h.playlistId, h.kind, h.itemId)
+                        // La tarjeta desaparece con el foco.
+                        runCatching { firstTile.requestFocus() }
+                    }
+                },
+            ),
+            onDismiss = { historyMenu = null },
+        )
+    }
 }
 
 @Composable
@@ -257,8 +282,8 @@ private fun ChannelCard(ch: ChannelEntity, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HistoryCard(h: HistoryEntity, onClick: () -> Unit) {
-    FocusSurface(onClick = onClick, modifier = Modifier.width(200.dp), radius = LumenDimens.radiusMedium) {
+private fun HistoryCard(h: HistoryEntity, onMenu: () -> Unit, onClick: () -> Unit) {
+    FocusSurface(onClick = onClick, modifier = Modifier.width(200.dp).onMenuKey(onMenu), radius = LumenDimens.radiusMedium) {
         Column {
             Artwork(h.image, h.title, Modifier.fillMaxWidth().aspectRatio(16f / 9f).padding(18.dp), radius = 0.dp, background = Color.Transparent)
             LText(h.title, style = Lumen.type.callout, maxLines = 1, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))

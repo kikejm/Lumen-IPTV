@@ -118,7 +118,12 @@ class UpdateManager(private val context: Context, private val http: OkHttpClient
     fun canInstall(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
 
+    /** Se ha abierto el instalador o sus ajustes: la Activity no debe tomarlo como que el usuario sale de la app. */
+    @Volatile
+    var openedSystemScreen = false
+
     fun openInstallPermissionSettings() {
+        openedSystemScreen = true
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
         } else {
@@ -129,6 +134,7 @@ class UpdateManager(private val context: Context, private val http: OkHttpClient
     }
 
     fun install(apk: File) {
+        openedSystemScreen = true
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", apk)
         val intent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, "application/vnd.android.package-archive")

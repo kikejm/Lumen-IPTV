@@ -196,6 +196,13 @@ interface LibraryDao {
 
     @Query("DELETE FROM history WHERE playlistId = :pid AND kind = :kind AND itemId = :itemId")
     suspend fun removeHistory(pid: Long, kind: ContentKind, itemId: String)
+
+    /** Deja solo las `keep` entradas más recientes de ese tipo. */
+    @Query(
+        "DELETE FROM history WHERE playlistId = :pid AND kind = :kind AND itemId NOT IN " +
+            "(SELECT itemId FROM history WHERE playlistId = :pid AND kind = :kind ORDER BY watchedAt DESC LIMIT :keep)",
+    )
+    suspend fun trimHistory(pid: Long, kind: ContentKind, keep: Int)
 }
 
 @Dao

@@ -62,7 +62,11 @@ fun SeriesScreen(nav: Navigator) {
         onCategoryMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES)) catMenu = it },
         items = posters,
         focused = focused?.toPoster(),
-        onFocus = { p -> vm.focused.value = series.firstOrNull { it.seriesId == p.id } },
+        restoreId = vm.restoreId,
+        onFocus = { p ->
+            vm.restoreId = p.id
+            vm.focused.value = series.firstOrNull { it.seriesId == p.id }
+        },
         onOpen = { nav.go(Routes.series(it.id)) },
         onItemMenu = { itemMenu = it },
         favorites = favorites,

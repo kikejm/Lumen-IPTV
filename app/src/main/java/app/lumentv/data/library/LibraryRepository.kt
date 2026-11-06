@@ -27,9 +27,17 @@ class LibraryRepository(private val db: LumenDatabase) {
 
     suspend fun historyItem(pid: Long, kind: ContentKind, itemId: String) = dao.historyItem(pid, kind, itemId)
 
-    suspend fun record(entry: HistoryEntity) = dao.upsertHistory(entry.copy(watchedAt = System.currentTimeMillis()))
+    suspend fun record(entry: HistoryEntity) {
+        dao.upsertHistory(entry.copy(watchedAt = System.currentTimeMillis()))
+        if (entry.kind == ContentKind.LIVE) dao.trimHistory(entry.playlistId, ContentKind.LIVE, MAX_LIVE_HISTORY)
+    }
 
     suspend fun clearHistory(pid: Long) = dao.clearHistory(pid)
 
     suspend fun removeHistory(pid: Long, kind: ContentKind, itemId: String) = dao.removeHistory(pid, kind, itemId)
+
+    companion object {
+        /** El historial de canales guarda solo los últimos vistos. */
+        const val MAX_LIVE_HISTORY = 10
+    }
 }

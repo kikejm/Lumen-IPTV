@@ -9,6 +9,7 @@ import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.PlaylistEntity
 import app.lumentv.data.epg.Program
+import app.lumentv.data.library.LibraryRepository
 import app.lumentv.di.AppGraph
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -71,7 +72,7 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
             when (cat) {
                 CAT_ALL -> graph.catalog.channels(p.id, null)
                 CAT_FAVORITES -> favoriteIds.mapLatest { ids -> graph.catalog.channelsByIds(p.id, ids.toList()).sortedBy { it.sortOrder } }
-                CAT_RECENT -> graph.library.history(p.id, ContentKind.LIVE, 50).mapLatest { h ->
+                CAT_RECENT -> graph.library.history(p.id, ContentKind.LIVE, LibraryRepository.MAX_LIVE_HISTORY).mapLatest { h ->
                     val byId = graph.catalog.channelsByIds(p.id, h.map { it.itemId }).associateBy { it.streamId }
                     h.mapNotNull { byId[it.itemId] }
                 }
@@ -110,24 +111,33 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
 
     /**
      * Canal que suena en la previsualización. No sigue al foco: moverse por canales o categorías no
-     * lo cambia; solo OK sobre otro canal ([preview]). Al entrar, el primero que recibe el foco.
+     * lo cambia; solo OK sobre un canal ([preview]). Al entrar no suena nada hasta el primer OK.
      */
     private val _previewChannel = MutableStateFlow<ChannelEntity?>(null)
     val previewChannel: StateFlow<ChannelEntity?> = _previewChannel
 
     fun onChannelFocused(ch: ChannelEntity) {
         focusedChannel.value = ch
-        if (_previewChannel.value == null) _previewChannel.value = ch
     }
 
     fun preview(ch: ChannelEntity) {
         _previewChannel.value = ch
     }
 
-    /** Enfoca y previsualiza un canal a la vez (al volver de pantalla completa con él sonando). */
-    fun showNow(ch: ChannelEntity) {
+    /**
+     * Al volver de pantalla completa: enfoca el canal que sonaba y, si llega su reproductor ([playing]),
+     * lo previsualiza. Si la lista a la vista no lo contiene (se estaba mirando otra categoría, o la pantalla
+     * es nueva por «Reanudar» desde Inicio) abre la categoría del canal, sin filtro de calidad si lo ocultaría.
+     */
+    fun returnTo(ch: ChannelEntity, playing: Boolean) {
+        val page = channelPage.value
+        val inView = page.categoryId == selectedCategory.value && page.channels.any { it.streamId == ch.streamId }
+        if (!inView && !isCategoryLocked(ch.categoryId)) {
+            selectedCategory.value = ch.categoryId
+            if (!ChannelQuality.matches(ch.name, graph.settings.current.liveQuality)) setQuality(QualityFilter.ALL)
+        }
         focusedChannel.value = ch
-        _previewChannel.value = ch
+        if (playing) _previewChannel.value = ch
     }
 
     fun isCategoryLocked(id: String) = graph.parental.isLocked(ContentKind.LIVE.name, id)

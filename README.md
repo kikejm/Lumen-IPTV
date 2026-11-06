@@ -15,7 +15,7 @@ Reproductor IPTV propio para **Amazon Fire TV / Fire TV Stick**, con diseño min
 | 🔲 **Multipantalla** | 6 disposiciones de 2 a 4 señales, audio en la que tenga el foco |
 | 🔎 **Búsqueda maestra** | En canales, películas y series a la vez |
 | 🛡️ **VPN integrada** | WireGuard con tus servidores de Proton VPN agrupados por país, conexión rápida, IP pública, tráfico, ámbito **"Solo Lumen"** o **"Todo el Fire TV"**, autoconectar al abrir y desconectar al salir |
-| 🎛️ **Reproductor** | Pistas de audio y subtítulos, modo de imagen, búfer, formato TS/HLS, User-Agent, reproductor externo (VLC, MX, Kodi), **Picture-in-Picture** |
+| 🎛️ **Reproductor** | Pistas de audio y subtítulos, modo de imagen, búfer, formato TS/HLS, User-Agent, reproductor externo (VLC, MX, Kodi) |
 | 🔒 **Control parental** | PIN de 4 dígitos y bloqueo por categoría |
 | ⚡ **Test de velocidad** | Descarga y latencia (a través de la VPN si está activa) |
 | 📱 **Configurar desde el móvil** | QR en la tele → página web para subir los `.conf` y la lista sin teclear con el mando |
@@ -163,9 +163,9 @@ Ver [.env.example](.env.example): valores de lista precargados, empaquetado de `
 |---|---|
 | ◀ ▲ ▼ ▶ | Navegar · en directo ▲▼ cambia de canal · en VOD ◀ −10 s / ▶ +30 s |
 | OK | Abrir / reproducir · en el reproductor: mostrar info y pausar |
-| ☰ | Opciones: favoritos, bloquear categoría, pistas de audio/subtítulos, formato de imagen, PiP |
+| ☰ | Opciones: favoritos, bloquear categoría, pistas de audio/subtítulos, formato de imagen |
 | Atrás | Volver · en el reproductor: ocultar info y salir |
-| Inicio | Con PiP activado, el vídeo sigue en una ventana pequeña |
+| Inicio | Cierra la app y vuelve al menú del Fire TV |
 
 ## Documentación
 

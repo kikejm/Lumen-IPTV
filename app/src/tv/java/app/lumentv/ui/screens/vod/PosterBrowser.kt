@@ -75,6 +75,8 @@ fun PosterBrowser(
     onCategoryMenu: (CategoryItem) -> Unit,
     items: List<PosterItem>,
     focused: PosterItem?,
+    /** Póster que recibe el foco al componerse la pantalla (el último enfocado); si no está, el primero. */
+    restoreId: String?,
     onFocus: (PosterItem) -> Unit,
     onOpen: (PosterItem) -> Unit,
     onItemMenu: (PosterItem) -> Unit,
@@ -125,15 +127,34 @@ fun PosterBrowser(
                     EmptyState(Icons.Rounded.Movie, emptyTitle, "Elige otra categoría o actualiza la lista desde Inicio.", Modifier.weight(1f))
                 } else {
                     val gridState = rememberLazyGridState()
-                    val firstPoster = remember { FocusRequester() }
-                    var initialFocusDone by rememberSaveable { mutableStateOf(false) }
+                    val targetPoster = remember { FocusRequester() }
+                    val targetId = items.firstOrNull { it.id == restoreId }?.id ?: items.first().id
+                    // Una vez por composición: al entrar y también al volver de la ficha o del reproductor,
+                    // el foco vuelve al último póster enfocado (con la rejilla en su sitio).
+                    var initialFocusDone by remember { mutableStateOf(false) }
                     LaunchedEffect(items.isNotEmpty()) {
                         if (!initialFocusDone && items.isNotEmpty()) {
                             delay(150)
-                            initialFocusDone = runCatching { firstPoster.requestFocus() }.isSuccess
+                            val index = items.indexOfFirst { it.id == targetId }
+                            if (gridState.layoutInfo.visibleItemsInfo.none { it.index == index }) gridState.scrollToItem(index)
+                            repeat(10) {
+                                if (runCatching { targetPoster.requestFocus() }.isSuccess) {
+                                    initialFocusDone = true
+                                    return@LaunchedEffect
+                                }
+                                delay(30)
+                            }
+                            initialFocusDone = true
                         }
                     }
-                    LaunchedEffect(selectedCategory) { gridState.scrollToItem(0) }
+                    // Al cambiar de categoría la rejilla vuelve arriba (no al volver a la pantalla: conserva su posición).
+                    var shownCategory by rememberSaveable { mutableStateOf(selectedCategory) }
+                    LaunchedEffect(selectedCategory) {
+                        if (selectedCategory != shownCategory) {
+                            shownCategory = selectedCategory
+                            gridState.scrollToItem(0)
+                        }
+                    }
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(118.dp),
                         state = gridState,
@@ -146,7 +167,7 @@ fun PosterBrowser(
                             FocusSurface(
                                 onClick = { onOpen(item) },
                                 onLongClick = { onItemMenu(item) }, // mantener OK = ☰
-                                modifier = (if (item.id == items.first().id) Modifier.focusRequester(firstPoster) else Modifier)
+                                modifier = (if (item.id == targetId) Modifier.focusRequester(targetPoster) else Modifier)
                                     .aspectRatio(2f / 3f)
                                     .onFocusChanged { if (it.isFocused) onFocus(item) }
                                     .onMenuKey { onItemMenu(item) },

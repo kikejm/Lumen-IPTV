@@ -103,9 +103,10 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     val widthClass = LocalWidthClass.current
     val vm: LiveViewModel = viewModel { LiveViewModel(graph) }
     // Al volver de pantalla completa llega su reproductor con el canal que sonaba (quizá tras hacer
-    // zapping): se previsualiza ese canal ya, antes de leer el estado, para no recargarlo.
+    // zapping): se previsualiza ese canal ya, antes de leer el estado, para no recargarlo. Si la lista
+    // a la vista no lo contiene, se abre su categoría.
     val returned = remember {
-        graph.players.takeHandOff()?.also { graph.playback.current?.channel?.let(vm::showNow) }
+        graph.players.takeHandOff()?.also { graph.playback.current?.channel?.let { vm.returnTo(it, playing = true) } }
     }
     val playlist by vm.playlist.collectAsState()
     val categories by vm.categories.collectAsState()
@@ -166,8 +167,13 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         player.prepare()
         player.playWhenReady = true
     }
-    // Al entrar, previsualiza el primer canal (como la TV con el primero que recibe el foco).
-    LaunchedEffect(channels.firstOrNull()?.streamId) { channels.firstOrNull()?.let(vm::onChannelFocused) }
+    // Al entrar, previsualiza el primer canal. (En la TV se espera al primer OK; en el móvil la
+    // previsualización está siempre a la vista y se llena sola.)
+    LaunchedEffect(channels.firstOrNull()?.streamId) {
+        if (vm.previewChannel.value == null) channels.firstOrNull()?.let(vm::preview)
+    }
+    // La EPG que se muestra es la del canal que suena.
+    LaunchedEffect(preview?.streamId) { preview?.let(vm::onChannelFocused) }
 
     fun watch(list: List<ChannelEntity>, index: Int) {
         val p = playlist ?: return
@@ -183,7 +189,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     }
     fun tapChannel(list: List<ChannelEntity>, index: Int) {
         val ch = list[index]
-        if (ch.streamId == preview?.streamId) watch(list, index) else vm.showNow(ch)
+        if (ch.streamId == preview?.streamId) watch(list, index) else vm.preview(ch)
     }
     fun watchPreview() {
         val ch = preview ?: return

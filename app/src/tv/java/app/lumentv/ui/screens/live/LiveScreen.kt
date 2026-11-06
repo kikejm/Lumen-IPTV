@@ -1,6 +1,7 @@
 package app.lumentv.ui.screens.live
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -8,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.HistoryToggleOff
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -54,12 +57,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -69,7 +77,7 @@ import app.lumentv.data.catalog.QualityFilter
 import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.PlaylistEntity
-import androidx.media3.common.PlaybackException
+import app.lumentv.data.settings.ResizeMode
 import androidx.media3.common.Player
 import app.lumentv.player.PlayerFactory
 import app.lumentv.ui.components.Artwork
@@ -84,13 +92,19 @@ import app.lumentv.ui.components.MenuOption
 import app.lumentv.ui.components.OptionsDialog
 import app.lumentv.ui.components.PinDialog
 import app.lumentv.ui.components.ProgressLine
+import app.lumentv.ui.components.ReconnectPill
+import app.lumentv.ui.components.rememberStreamReconnect
 import app.lumentv.ui.components.TopBar
 import app.lumentv.ui.components.VideoSurface
+import app.lumentv.ui.components.VideoZoomSpec
+import app.lumentv.ui.components.placedAt
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.onMenuKey
 import app.lumentv.ui.playChannels
+import app.lumentv.ui.screens.player.EmbeddedPlayer
+import app.lumentv.ui.screens.player.PlayerScreen
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import kotlinx.coroutines.delay
@@ -115,7 +129,9 @@ fun LiveScreen(nav: Navigator) {
     // Al volver de pantalla completa llega su reproductor con el canal que sonaba (quizá tras hacer zapping):
     // se enfoca y previsualiza ese canal ya, antes de leer el estado, para que la previsualización no lo recargue.
     val returned = remember {
-        graph.players.takeHandOff()?.also { graph.playback.current?.channel?.let(vm::showNow) }
+        val back = graph.playback.takeReturnFocus(Routes.LIVE)
+        val ch = graph.playback.current?.channel?.takeIf { it.streamId == back?.itemId }
+        graph.players.takeHandOff().also { player -> ch?.let { vm.returnTo(it, playing = player != null) } }
     }
     val playlist by vm.playlist.collectAsState()
     val categories by vm.categories.collectAsState()
@@ -136,60 +152,64 @@ fun LiveScreen(nav: Navigator) {
     var menuFor by remember { mutableStateOf<CategoryItem?>(null) }
     var channelMenu by remember { mutableStateOf<ChannelEntity?>(null) }
 
-    // Reproductor de previsualización: vive mientras la pantalla está abierta, salvo que pase a
-    // pantalla completa con su canal (por eso tiene el búfer normal y no el ligero).
+    // Reproductor de previsualización: vive mientras la pantalla está abierta y es también el de
+    // pantalla completa (por eso tiene el búfer normal y no el ligero).
     val player = remember { returned ?: graph.players.create() }
-    var handedOff by remember { mutableStateOf(false) }
+    // Pantalla completa: el vídeo de la previsualización crece hasta ocupar la pantalla y encima van los controles
+    // del reproductor. Es el mismo reproductor y el mismo SurfaceView: ampliar y reducir no corta ni parpadea.
+    var fullscreen by remember { mutableStateOf(false) }
+    var fullscreenResize by remember { mutableStateOf(settings.resizeMode) }
+    val zoom = remember { Animatable(0f) }
+    LaunchedEffect(fullscreen) { zoom.animateTo(if (fullscreen) 1f else 0f, VideoZoomSpec) }
+    var screenBounds by remember { mutableStateOf(Rect.Zero) }
+    var previewBounds by remember { mutableStateOf(Rect.Zero) }
     var previewState by remember { mutableIntStateOf(player.playbackState) }
-    var previewFailed by remember { mutableStateOf(false) }
-    var previewRetry by remember { mutableIntStateOf(0) }
-    // Un directo que termina es un corte de emisión: se vuelve a conectar.
-    var previewReconnect by remember { mutableIntStateOf(0) }
+    // Al salir de pantalla completa, la previsualización comprueba que sigue sonando su canal.
+    var previewResync by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 previewState = state
-                if (state == Player.STATE_ENDED) previewReconnect++
-            }
-            override fun onPlayerError(error: PlaybackException) {
-                // Un rechazo justo al volver del reproductor suele ser la conexión anterior aún abierta: un reintento.
-                if (previewRetry < 1) previewRetry++ else previewFailed = true
             }
         }
         player.addListener(listener)
         onDispose {
             player.removeListener(listener)
-            if (!handedOff) player.release()
+            player.release()
         }
     }
 
-    // Pantalla completa. Si la previsualización ya muestra ese canal, su reproductor sigue sin recargar.
+    // Pantalla completa. Si la previsualización ya muestra ese canal, se amplía ella misma sin recargar.
     fun watch(list: List<ChannelEntity>, index: Int) {
         val p = playlist ?: return
         val ch = list[index]
         if (settings.externalPlayerPackage.isBlank() && preview?.streamId == ch.streamId &&
             PlayerFactory.isLoaded(player, graph.streams.live(p, ch).url)
         ) {
-            handedOff = true
-            graph.players.handOff(player)
+            graph.playback.start(list.map { graph.streams.live(p, it) }, index)
+            fullscreenResize = settings.resizeMode
+            fullscreen = true
+        } else {
+            graph.playChannels(context, nav, p, list, index)
         }
-        graph.playChannels(context, nav, p, list, index)
     }
-    LaunchedEffect(preview) { previewRetry = 0 }
-    LaunchedEffect(preview, playlist, previewRetry, previewReconnect) {
-        val p = playlist ?: return@LaunchedEffect
-        val ch = preview ?: return@LaunchedEffect
+    /** `force`: vuelve a abrir el stream aunque conste como cargado (se ha quedado colgado). */
+    fun loadPreview(force: Boolean = false) {
+        val p = playlist ?: return
+        val ch = preview ?: return
         val url = graph.streams.live(p, ch).url
-        previewFailed = false
-        if (previewRetry == 0 && PlayerFactory.isLoaded(player, url)) {
-            player.playWhenReady = true // ya sonaba (vuelta de pantalla completa)
-            return@LaunchedEffect
+        if (force || !PlayerFactory.isLoaded(player, url)) {
+            graph.players.claimStream(player)
+            player.setMediaItem(PlayerFactory.mediaItem(url))
+            player.prepare()
         }
-        if (previewRetry > 0) delay(2_000)
-        graph.players.claimStream(player)
-        player.setMediaItem(PlayerFactory.mediaItem(url))
-        player.prepare()
-        player.playWhenReady = true
+        player.playWhenReady = true // si ya sonaba (vuelta de pantalla completa), sigue sin recargar
+    }
+    // A pantalla completa los cortes y reintentos los gestiona el reproductor.
+    val previewReconnect = rememberStreamReconnect(player, isActive = { !fullscreen && preview != null }) { loadPreview(force = true) }
+    LaunchedEffect(preview, playlist, previewResync) {
+        previewReconnect.reset()
+        loadPreview()
     }
 
     // Las categorías solo se muestran mientras se navega por ellas: ◀ desde los canales las abre,
@@ -216,6 +236,29 @@ fun LiveScreen(nav: Navigator) {
         focusFirstChannel = false
     }
 
+    // Al quitar un canal del historial su fila desaparece con el foco: pasa al canal vecino en cuanto se actualiza la lista.
+    var removedChannel by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(page, removedChannel) {
+        val id = removedChannel ?: return@LaunchedEffect
+        if (channels.none { it.streamId == id }) {
+            channelFocus.requestFocusWhenReady()
+            removedChannel = null
+        }
+    }
+
+    fun removeFromHistory(ch: ChannelEntity) {
+        val p = playlist ?: return
+        val index = channels.indexOfFirst { it.streamId == ch.streamId }
+        val neighbor = channels.getOrNull(index + 1) ?: channels.getOrNull(index - 1)
+        if (neighbor != null) {
+            vm.onChannelFocused(neighbor)
+            removedChannel = ch.streamId
+        } else {
+            showCategories = true // era el último: la lista queda vacía
+        }
+        scope.launch { graph.library.removeHistory(p.id, ContentKind.LIVE, ch.streamId) }
+    }
+
     fun select(cat: CategoryItem) {
         if (vm.isCategoryLocked(cat.id)) {
             pinFor = cat
@@ -225,188 +268,250 @@ fun LiveScreen(nav: Navigator) {
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().background(c.background)
-            .padding(horizontal = LumenDimens.safeHorizontal, vertical = LumenDimens.safeVertical),
-    ) {
-        TopBar(nav, Routes.LIVE)
-        Gap(height = 18.dp)
-        Row(Modifier.weight(1f)) {
-            // 1) Categorías (plegables)
-            AnimatedVisibility(
-                visible = categoriesVisible,
-                enter = expandHorizontally(tween(PANEL_ANIM_MS), expandFrom = Alignment.Start) + fadeIn(tween(PANEL_ANIM_MS)),
-                exit = shrinkHorizontally(tween(PANEL_ANIM_MS), shrinkTowards = Alignment.Start) + fadeOut(tween(PANEL_ANIM_MS)),
-            ) {
-                Row(
-                    Modifier.fillMaxHeight().onPreviewKeyEvent { e ->
-                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight && channels.isNotEmpty()) {
-                            runCatching { channelFocus.requestFocus() }
-                            true
-                        } else {
-                            false
-                        }
-                    },
+    Box(Modifier.fillMaxSize().onGloballyPositioned { screenBounds = it.boundsInRoot() }) {
+        Column(
+            Modifier.fillMaxSize().background(c.background)
+                .padding(horizontal = LumenDimens.safeHorizontal, vertical = LumenDimens.safeVertical),
+        ) {
+            TopBar(nav, Routes.LIVE)
+            Gap(height = 18.dp)
+            Row(Modifier.weight(1f)) {
+                // 1) Categorías (plegables)
+                AnimatedVisibility(
+                    visible = categoriesVisible,
+                    enter = expandHorizontally(tween(PANEL_ANIM_MS), expandFrom = Alignment.Start) + fadeIn(tween(PANEL_ANIM_MS)),
+                    exit = shrinkHorizontally(tween(PANEL_ANIM_MS), shrinkTowards = Alignment.Start) + fadeOut(tween(PANEL_ANIM_MS)),
                 ) {
-                    CategoryColumn(
-                        items = categories,
-                        selectedId = selected,
-                        onSelect = ::select,
-                        onMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) menuFor = it },
-                        selectedFocusRequester = categoryFocus,
-                        modifier = Modifier.width(190.dp).fillMaxHeight(),
-                    )
-                }
-            }
-            // Separador siempre visible: plegado, recuerda que ◀ despliega las categorías.
-            PanelHandle(expanded = categoriesVisible)
-
-            // 2) Canales (con filtro de calidad encima si la categoría tiene varias)
-            Column(Modifier.weight(channelsWeight).fillMaxHeight()) {
-                if (qualities.size > 1 || quality != QualityFilter.ALL) {
-                    QualityRow(
-                        options = if (quality in qualities) qualities else qualities + quality,
-                        selected = quality,
-                        onSelect = vm::setQuality,
-                        onFocus = { showCategories = false },
-                    )
-                }
-                Box(
-                    Modifier.weight(1f).fillMaxWidth().onPreviewKeyEvent { e ->
-                        when {
-                            e.type != KeyEventType.KeyDown -> false
-                            e.key == Key.DirectionLeft -> { showCategories = true; true }
-                            e.key == Key.DirectionRight -> { runCatching { previewFocus.requestFocus() }; true }
-                            else -> false
-                        }
-                    },
-                ) {
-                    if (channels.isEmpty()) {
-                        val filtered = quality != QualityFilter.ALL && selected != CAT_FAVORITES && selected != CAT_RECENT
-                        EmptyState(
-                            Icons.Rounded.Tv,
-                            when {
-                                selected == CAT_FAVORITES -> "Sin favoritos"
-                                selected == CAT_RECENT -> "Sin historial"
-                                filtered -> "Ningún canal ${quality.label}"
-                                else -> "Sin canales"
-                            },
-                            when {
-                                selected == CAT_FAVORITES -> "Pulsa ☰ sobre un canal para añadirlo a favoritos."
-                                filtered -> "Esta categoría no tiene canales en esa calidad. Elige «Todas» arriba."
-                                else -> "Actualiza la lista desde Inicio si acabas de añadirla."
-                            },
-                        )
-                    } else {
-                        val listState = rememberLazyListState()
-                        LaunchedEffect(channels.isNotEmpty()) {
-                            if (!initialFocusDone && channels.isNotEmpty()) {
-                                delay(150)
-                                // El canal enfocado puede quedar lejos (zapping en pantalla completa): primero se lleva a la vista.
-                                val index = channels.indexOfFirst { it.streamId == focused?.streamId }
-                                if (index > 0) listState.scrollToItem((index - 2).coerceAtLeast(0))
-                                channelFocus.requestFocusWhenReady()
-                                initialFocusDone = true
-                            }
-                        }
-                        LaunchedEffect(selected, quality) { listState.scrollToItem(0) }
-                        // ▶ desde las categorías vuelve al último canal enfocado; con categoría nueva, al primero.
-                        val focusTarget = focused?.streamId?.takeIf { id -> !focusFirstChannel && channels.any { it.streamId == id } }
-                            ?: channels.first().streamId
-                        LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(6.dp)) {
-                            itemsIndexed(channels, key = { _, ch -> ch.streamId }) { index, ch ->
-                                ChannelRow(
-                                    modifier = if (ch.streamId == focusTarget) Modifier.focusRequester(channelFocus) else Modifier,
-                                    channel = ch,
-                                    playlist = playlist,
-                                    isFavorite = ch.streamId in favorites,
-                                    isPreviewing = ch.streamId == preview?.streamId,
-                                    fmt = fmt,
-                                    onFocus = {
-                                        vm.onChannelFocused(ch)
-                                        showCategories = false
-                                    },
-                                    // OK sobre otro canal lo pasa a la previsualización; sobre el que ya suena, a pantalla completa.
-                                    onClick = { if (ch.streamId == preview?.streamId) watch(channels, index) else vm.preview(ch) },
-                                    onMenu = { channelMenu = ch },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Gap(width = 18.dp)
-
-            // 3) Previsualización + EPG
-            Column(Modifier.weight(previewWeight).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
-                    // El vídeo va fuera de la superficie enfocable: la capa que esta pinta (escala, halo) tapa el
-                    // hueco del SurfaceView y la previsualización se oía pero se veía negra.
-                    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
-                        if (preview != null) VideoSurface(player, Modifier.fillMaxSize())
-                        when {
-                            preview == null -> Unit
-                            previewFailed -> LText("No disponible", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
-                            previewState != Player.STATE_READY -> LoadingSpinner(Modifier.align(Alignment.Center))
-                        }
-                    }
-                    // Encima, transparente: solo aporta el foco y el anillo.
-                    FocusSurface(
-                        onClick = {
-                            preview?.let { ch ->
-                                val index = channels.indexOfFirst { it.streamId == ch.streamId }
-                                if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
+                    Row(
+                        Modifier.fillMaxHeight().onPreviewKeyEvent { e ->
+                            if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight && channels.isNotEmpty()) {
+                                runCatching { channelFocus.requestFocus() }
+                                true
+                            } else {
+                                false
                             }
                         },
-                        modifier = Modifier.fillMaxSize()
-                            .focusRequester(previewFocus)
-                            .onFocusChanged { previewFocused = it.isFocused }
-                            .onMenuKey { preview?.let { channelMenu = it } }
-                            .onPreviewKeyEvent { e ->
-                                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
-                                    runCatching { channelFocus.requestFocus() }
-                                    true
+                    ) {
+                        CategoryColumn(
+                            items = categories,
+                            selectedId = selected,
+                            onSelect = ::select,
+                            onMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) menuFor = it },
+                            selectedFocusRequester = categoryFocus,
+                            modifier = Modifier.width(190.dp).fillMaxHeight(),
+                        )
+                    }
+                }
+                // Separador siempre visible: plegado, recuerda que ◀ despliega las categorías.
+                PanelHandle(expanded = categoriesVisible)
+
+                // 2) Canales (con filtro de calidad encima si la categoría tiene varias)
+                Column(Modifier.weight(channelsWeight).fillMaxHeight()) {
+                    if (qualities.size > 1 || quality != QualityFilter.ALL) {
+                        QualityRow(
+                            options = if (quality in qualities) qualities else qualities + quality,
+                            selected = quality,
+                            onSelect = vm::setQuality,
+                            onFocus = { showCategories = false },
+                        )
+                    }
+                    Box(
+                        Modifier.weight(1f).fillMaxWidth().onPreviewKeyEvent { e ->
+                            when {
+                                e.type != KeyEventType.KeyDown -> false
+                                e.key == Key.DirectionLeft -> { showCategories = true; true }
+                                e.key == Key.DirectionRight -> { runCatching { previewFocus.requestFocus() }; true }
+                                else -> false
+                            }
+                        },
+                    ) {
+                        if (channels.isEmpty()) {
+                            val filtered = quality != QualityFilter.ALL && selected != CAT_FAVORITES && selected != CAT_RECENT
+                            EmptyState(
+                                Icons.Rounded.Tv,
+                                when {
+                                    selected == CAT_FAVORITES -> "Sin favoritos"
+                                    selected == CAT_RECENT -> "Sin historial"
+                                    filtered -> "Ningún canal ${quality.label}"
+                                    else -> "Sin canales"
+                                },
+                                when {
+                                    selected == CAT_FAVORITES -> "Pulsa ☰ sobre un canal para añadirlo a favoritos."
+                                    filtered -> "Esta categoría no tiene canales en esa calidad. Elige «Todas» arriba."
+                                    else -> "Actualiza la lista desde Inicio si acabas de añadirla."
+                                },
+                            )
+                        } else {
+                            val listState = rememberLazyListState()
+                            // Al volver de pantalla completa la categoría puede haber cambiado: se espera a su lista.
+                            LaunchedEffect(pageReady, channels, initialFocusDone) {
+                                if (!initialFocusDone && pageReady) {
+                                    delay(150)
+                                    // Sin el canal aún, la lista puede venir con el filtro de calidad anterior: si llega otra, este efecto se reinicia.
+                                    if (focused != null && channels.none { it.streamId == focused?.streamId }) delay(1_000)
+                                    // El canal enfocado puede quedar lejos (zapping en pantalla completa): primero se lleva a la vista.
+                                    val index = channels.indexOfFirst { it.streamId == focused?.streamId }
+                                    if (index > 0) listState.scrollToItem((index - 2).coerceAtLeast(0))
+                                    channelFocus.requestFocusWhenReady()
+                                    initialFocusDone = true
+                                }
+                            }
+                            LaunchedEffect(selected, quality) { listState.scrollToItem(0) }
+                            // ▶ desde las categorías vuelve al último canal enfocado; con categoría nueva, al primero.
+                            val focusTarget = focused?.streamId?.takeIf { id -> !focusFirstChannel && channels.any { it.streamId == id } }
+                                ?: channels.first().streamId
+                            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(6.dp)) {
+                                itemsIndexed(channels, key = { _, ch -> ch.streamId }) { index, ch ->
+                                    ChannelRow(
+                                        modifier = if (ch.streamId == focusTarget) Modifier.focusRequester(channelFocus) else Modifier,
+                                        channel = ch,
+                                        playlist = playlist,
+                                        isFavorite = ch.streamId in favorites,
+                                        isPreviewing = ch.streamId == preview?.streamId,
+                                        fmt = fmt,
+                                        onFocus = {
+                                            vm.onChannelFocused(ch)
+                                            showCategories = false
+                                        },
+                                        // OK sobre otro canal lo pasa a la previsualización; sobre el que ya suena, a pantalla completa.
+                                        onClick = { if (ch.streamId == preview?.streamId) watch(channels, index) else vm.preview(ch) },
+                                        onMenu = { channelMenu = ch },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Gap(width = 18.dp)
+
+                // 3) Previsualización + EPG
+                Column(Modifier.weight(previewWeight).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).onGloballyPositioned { previewBounds = it.boundsInRoot() }) {
+                        // El vídeo no va aquí sino al final de la pantalla (ver abajo): para ampliarse debe pintarse sobre todo lo demás.
+                        Box(Modifier.fillMaxSize().clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
+                            // Al entrar no se carga ningún canal: suena el primero al que se dé OK.
+                            if (preview == null) {
+                                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(40.dp))
+                                    LText("Pulse OK", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f))
+                                }
+                            }
+                        }
+                        // Encima, transparente: solo aporta el foco y el anillo.
+                        FocusSurface(
+                            onClick = {
+                                val ch = preview
+                                if (ch == null) {
+                                    focused?.let(vm::preview)
                                 } else {
-                                    false
+                                    val index = channels.indexOfFirst { it.streamId == ch.streamId }
+                                    if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
                                 }
                             },
-                        radius = LumenDimens.radiusMedium,
-                        containerColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        focusedScale = 1f,
-                        showGlow = false,
-                    ) {}
-                }
-                focused?.let { ch ->
-                    LText(ch.name, style = Lumen.type.headline, maxLines = 1)
-                    if (programs.isEmpty()) {
-                        LText("Sin información de programación", style = Lumen.type.body, color = c.textSecondary)
+                            modifier = Modifier.fillMaxSize()
+                                .focusRequester(previewFocus)
+                                .onFocusChanged { previewFocused = it.isFocused }
+                                .onMenuKey { preview?.let { channelMenu = it } }
+                                .onPreviewKeyEvent { e ->
+                                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                                        runCatching { channelFocus.requestFocus() }
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
+                            radius = LumenDimens.radiusMedium,
+                            containerColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            focusedScale = 1f,
+                            showGlow = false,
+                        ) {}
                     }
-                    programs.forEachIndexed { i, prog ->
-                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                LText(fmt.range(prog.startAt, prog.stopAt), style = Lumen.type.callout, color = if (i == 0) c.accent else c.textSecondary)
-                                LText(prog.title, style = Lumen.type.callout, maxLines = 1)
-                            }
-                            if (i == 0) {
-                                ProgressLine(prog.progress())
-                                if (prog.description.isNotBlank()) LText(prog.description, style = Lumen.type.body, color = c.textSecondary, maxLines = 3)
-                                Gap(height = 4.dp)
-                                LText("A CONTINUACIÓN", style = Lumen.type.caption, color = c.textTertiary)
+                    focused?.let { ch ->
+                        LText(ch.name, style = Lumen.type.headline, maxLines = 1)
+                        if (programs.isEmpty()) {
+                            LText("Sin información de programación", style = Lumen.type.body, color = c.textSecondary)
+                        }
+                        programs.forEachIndexed { i, prog ->
+                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    LText(fmt.range(prog.startAt, prog.stopAt), style = Lumen.type.callout, color = if (i == 0) c.accent else c.textSecondary)
+                                    LText(prog.title, style = Lumen.type.callout, maxLines = 1)
+                                }
+                                if (i == 0) {
+                                    ProgressLine(prog.progress())
+                                    if (prog.description.isNotBlank()) LText(prog.description, style = Lumen.type.body, color = c.textSecondary, maxLines = 3)
+                                    Gap(height = 4.dp)
+                                    LText("A CONTINUACIÓN", style = Lumen.type.caption, color = c.textTertiary)
+                                }
                             }
                         }
                     }
                 }
             }
+            Gap(height = 10.dp)
+            when {
+                previewFocused && preview == null -> KeyHints("OK" to "Previsualizar", "◀" to "Canales")
+                previewFocused -> KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Canales")
+                categoriesVisible -> KeyHints("OK" to "Elegir", "☰" to "Opciones", "▶" to "Canales")
+                focused != null && focused?.streamId == preview?.streamId ->
+                    KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
+                else -> KeyHints("OK" to "Previsualizar", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
+            }
         }
-        Gap(height = 10.dp)
-        when {
-            previewFocused -> KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Canales")
-            categoriesVisible -> KeyHints("OK" to "Elegir", "☰" to "Opciones", "▶" to "Canales")
-            focused != null && focused?.streamId == preview?.streamId ->
-                KeyHints("OK" to "Pantalla completa", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
-            else -> KeyHints("OK" to "Previsualizar", "☰" to "Opciones", "◀" to "Categorías", "▶" to "Vista previa")
+
+        // El vídeo, siempre el mismo y encima de todo: en reposo ocupa el hueco de la previsualización y a pantalla completa, la pantalla.
+        // Va fuera de la superficie enfocable: la capa que esta pinta (escala, halo) tapa el hueco del SurfaceView y se oiría pero se vería negro.
+        if (preview != null) {
+            Box(
+                Modifier
+                    .placedAt { lerp(previewBounds, screenBounds, zoom.value) }
+                    .graphicsLayer {
+                        clip = true
+                        shape = RoundedCornerShape(LumenDimens.radiusMedium * (1f - zoom.value))
+                    }
+                    .background(Color.Black),
+            ) {
+                VideoSurface(player, Modifier.fillMaxSize(), if (fullscreen) fullscreenResize else ResizeMode.FIT)
+                if (!fullscreen) {
+                    when {
+                        previewReconnect.failed -> LText("No disponible", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
+                        previewState != Player.STATE_READY -> LoadingSpinner(Modifier.align(Alignment.Center))
+                    }
+                    if (previewReconnect.attempt > 0 && !previewReconnect.failed) {
+                        ReconnectPill(previewReconnect.attempt, Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp))
+                    }
+                }
+            }
+            // El anillo de foco de la previsualización queda tapado por el vídeo: se repite encima.
+            if (previewFocused && !fullscreen) {
+                Box(
+                    Modifier.placedAt { previewBounds }
+                        .border(2.dp, c.focusRing, RoundedCornerShape(LumenDimens.radiusMedium)),
+                )
+            }
+        }
+        if (fullscreen) {
+            // Los controles aparecen al final del zoom, sin pisar la interfaz que el vídeo aún no ha tapado.
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = (zoom.value - 0.6f).coerceAtLeast(0f) / 0.4f }) {
+                PlayerScreen(
+                    nav,
+                    remember(player) {
+                        EmbeddedPlayer(
+                            player,
+                            onExit = {
+                                fullscreen = false
+                                // Vuelve a la lista: al canal que sonaba (quizá tras hacer zapping), en su categoría.
+                                graph.playback.current?.channel?.let { vm.returnTo(it, playing = true) }
+                                initialFocusDone = false
+                                previewResync++ // si se salió con un error, la previsualización vuelve a conectar
+                            },
+                            onResizeChange = { fullscreenResize = it },
+                        )
+                    },
+                )
+            }
         }
     }
 
@@ -442,6 +547,9 @@ fun LiveScreen(nav: Navigator) {
                 add(MenuOption(if (isFav) "Quitar de favoritos" else "Añadir a favoritos", if (isFav) Icons.Rounded.FavoriteBorder else Icons.Rounded.Favorite) {
                     playlist?.let { p -> scope.launch { graph.library.toggleFavorite(p.id, ContentKind.LIVE, ch.streamId) } }
                 })
+                if (selected == CAT_RECENT && !previewFocused) {
+                    add(MenuOption("Quitar del historial", Icons.Rounded.HistoryToggleOff) { removeFromHistory(ch) })
+                }
                 if (ch.tvArchive) add(MenuOption("Ver programas pasados (catch-up)", Icons.Rounded.History) { nav.go(Routes.CATCHUP) })
             },
             onDismiss = { channelMenu = null },

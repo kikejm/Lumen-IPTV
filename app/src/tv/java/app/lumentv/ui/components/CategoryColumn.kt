@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -38,6 +39,11 @@ fun CategoryColumn(
 ) {
     val c = Lumen.colors
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = items.indexOfFirst { it.id == selectedId }.coerceAtLeast(0))
+    // Las categorías suelen llegar después de componerse: la elegida (p. ej. la de una película reanudada) se trae a la vista.
+    LaunchedEffect(items.isNotEmpty()) {
+        val index = items.indexOfFirst { it.id == selectedId }
+        if (index > 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == index }) listState.scrollToItem((index - 2).coerceAtLeast(0))
+    }
     LazyColumn(
         modifier = modifier,
         state = listState,

@@ -32,6 +32,7 @@ data class AppSettings(
     val resizeMode: ResizeMode = ResizeMode.FIT,
     val externalPlayerPackage: String = "",
     val autoRefreshHours: Int = 24,
+    /** Imagen en imagen al salir de la app con vídeo. Solo móvil: la TV no tiene PiP. */
     val pipEnabled: Boolean = true,
     val vpnAutoConnect: Boolean = false,
     val vpnDisconnectOnExit: Boolean = true,
