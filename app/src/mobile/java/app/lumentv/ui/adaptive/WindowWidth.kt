@@ -32,3 +32,11 @@ fun currentWidthClass(): WidthClass {
 
 /** La fija `MobileRoot` para que cualquier pantalla sepa cómo maquetarse sin recalcularlo. */
 val LocalWidthClass = staticCompositionLocalOf { WidthClass.Compact }
+
+/**
+ * Altura compacta (< 480 dp, el corte de Material): el móvil en horizontal. Ahí no caben una
+ * encima de otra la barra superior, la previsualización y la lista, así que TV en directo se
+ * maqueta aparte, y el raíl lateral prescinde de su cabecera para que quepan las cinco pestañas.
+ */
+@Composable
+fun isCompactHeight(): Boolean = LocalConfiguration.current.screenHeightDp < 480

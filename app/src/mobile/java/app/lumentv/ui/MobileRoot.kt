@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Home
@@ -32,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -39,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.exoplayer.ExoPlayer
@@ -56,6 +61,7 @@ import app.lumentv.di.AppGraph
 import app.lumentv.player.PlayItem
 import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.adaptive.WidthClass
+import app.lumentv.ui.adaptive.isCompactHeight
 import app.lumentv.ui.adaptive.currentWidthClass
 import app.lumentv.ui.components.LText
 import app.lumentv.ui.navigation.LocalGraph
@@ -214,12 +220,20 @@ private fun MobileNavHost(startOnboarding: Boolean) {
     val showBottomBar = showNav && widthClass == WidthClass.Compact
     var sides = WindowInsetsSides.Top + WindowInsetsSides.End
     if (!showRail) sides += WindowInsetsSides.Start // el raíl ya respeta el recorte de cámara
+    // Con el teclado abierto el mini reproductor se oculta: quedaría tapado y su hueco se sumaría
+    // al del teclado en las pantallas con campos de texto.
+    // (derivedStateOf: solo recompone al abrirse o cerrarse, no en cada fotograma de la animación).
+    val ime = WindowInsets.ime
+    val density = LocalDensity.current
+    val imeOpen by remember(ime, density) { derivedStateOf { ime.getBottom(density) > 0 } }
     // Mini reproductor: sobre la barra inferior en cualquier pantalla salvo el propio reproductor.
-    val showMini = mini.player != null && route != Routes.PLAYER
+    val showMini = mini.player != null && route != Routes.PLAYER && !imeOpen
     if (!showBottomBar && !showMini) sides += WindowInsetsSides.Bottom // la barra inferior (o el mini reproductor) ya respeta la de gestos
-    val insets = WindowInsets.safeDrawing.only(sides).asPaddingValues()
+    // Sin el teclado (safeDrawing lo incluye): lo aplican con imePadding solo las pantallas con campos
+    // de texto. Si estuviera aquí también, el hueco sería el doble y taparía el formulario.
+    val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(sides).asPaddingValues()
     Row(Modifier.fillMaxSize()) {
-        if (showRail) SideRail(route, nav)
+        if (showRail) SideRail(route, nav, showHeader = !isCompactHeight())
         Column(Modifier.weight(1f).fillMaxHeight()) {
             Box(Modifier.weight(1f)) { host(insets) }
             if (showMini) {
@@ -257,14 +271,16 @@ private fun BottomBar(route: String?, nav: Navigator) {
 }
 
 @Composable
-private fun SideRail(route: String?, nav: Navigator) {
+private fun SideRail(route: String?, nav: Navigator, showHeader: Boolean) {
     val c = Lumen.colors
     NavigationRail(
-        // Incluye el recorte de cámara: en horizontal suele quedar a este lado.
-        windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
+        // Incluye el recorte de cámara: en horizontal suele quedar a este lado. Sin el teclado.
+        windowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
         containerColor = c.surface,
         contentColor = c.textPrimary,
-        header = { LText("IPTV", style = Lumen.type.headline, modifier = Modifier.padding(vertical = 12.dp)) },
+        // En horizontal en el móvil (≈ 340 dp de alto) la cabecera no deja sitio a las cinco
+        // pestañas: «Guía» se montaba sobre «Series».
+        header = { if (showHeader) LText("IPTV", style = Lumen.type.headline, modifier = Modifier.padding(vertical = 12.dp)) },
     ) {
         MainDestinations.forEach { d ->
             NavigationRailItem(
