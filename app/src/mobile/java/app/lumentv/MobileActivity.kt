@@ -1,11 +1,13 @@
 package app.lumentv
 
 import android.app.PictureInPictureParams
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
 import android.util.Rational
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -15,8 +17,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import app.lumentv.ui.MobileRoot
+import app.lumentv.ui.screens.vpn.ConfImport
 import kotlinx.coroutines.launch
 
 /**
@@ -84,7 +88,35 @@ class MobileActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         setContent { MobileRoot(graph) }
-        if (savedInstanceState == null) autoConnectVpn()
+        if (savedInstanceState == null) {
+            autoConnectVpn()
+            importShared(intent)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        importShared(intent)
+    }
+
+    /**
+     * Un `.conf` abierto con IPTV («Abrir con») o compartido desde otra app (Archivos, navegador,
+     * correo). Se importa en appScope y `MobileRoot` lleva a la pantalla VPN, que muestra el resultado.
+     */
+    private fun importShared(intent: Intent?) {
+        intent ?: return
+        val uris: List<Uri> = when (intent.action) {
+            Intent.ACTION_VIEW -> listOfNotNull(intent.data)
+            Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+            Intent.ACTION_SEND_MULTIPLE -> IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+            else -> return
+        }
+        val text = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT) else null
+        // Que no se vuelva a importar si la Activity se recrea con el mismo Intent.
+        setIntent(Intent(Intent.ACTION_MAIN))
+        if (uris.isEmpty() && text.isNullOrBlank()) return
+        // Se lee ya, mientras dura el permiso temporal sobre los ficheros que da la otra app.
+        graph.appScope.launch { ConfImport.post(ConfImport.import(applicationContext, graph, uris, text)) }
     }
 
     /** Pide (una sola vez) el permiso de VPN de Android y devuelve si está concedido. */

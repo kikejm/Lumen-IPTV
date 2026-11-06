@@ -30,6 +30,8 @@ import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -69,6 +71,8 @@ import app.lumentv.ui.screens.vod.SeriesDetailScreen
 import app.lumentv.ui.screens.vod.SeriesScreen
 import app.lumentv.ui.screens.placeholder.ComingSoonScreen
 import app.lumentv.ui.screens.playlist.PlaylistEditScreen
+import app.lumentv.ui.screens.vpn.ConfImport
+import app.lumentv.ui.screens.vpn.VpnScreen
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenTheme
 
@@ -117,6 +121,13 @@ private fun MobileNavHost(startOnboarding: Boolean) {
     val widthClass = LocalWidthClass.current
     val showNav = route in MainRoutes
 
+    // Un .conf abierto o compartido desde otra app se importa en MobileActivity; aquí se lleva al
+    // usuario a la pantalla VPN, que muestra el resultado.
+    val confNotice by ConfImport.notice.collectAsState()
+    LaunchedEffect(confNotice, route == null) {
+        if (confNotice != null && route != null && route != Routes.VPN) nav.go(Routes.VPN)
+    }
+
     // En Inicio, el gesto atrás sale de la app (comportamiento estándar de Android; en el móvil
     // no hace falta el «pulsa de nuevo para salir» de la TV). Lo hace el propio NavHost.
     val host: @Composable (PaddingValues) -> Unit = { insets ->
@@ -126,7 +137,6 @@ private fun MobileNavHost(startOnboarding: Boolean) {
             composable(Routes.PLAYLIST_EDIT, arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null })) {
                 PlaylistEditScreen(nav, insets, it.arguments?.getString("id")?.toLongOrNull(), isOnboarding = false)
             }
-            // Pantallas de la fase 5 del plan: de momento, un aviso.
             composable(Routes.LIVE) { LiveScreen(nav, insets) }
             composable(Routes.MOVIES) { MoviesScreen(nav, insets) }
             composable(Routes.SERIES) { SeriesScreen(nav, insets) }
@@ -143,8 +153,9 @@ private fun MobileNavHost(startOnboarding: Boolean) {
                 SeriesDetailScreen(nav, insets, it.arguments?.getString("id").orEmpty())
             }
             composable(Routes.PLAYER) { PlayerScreen(nav, insets) }
+            // Pendiente de la fase 5 del plan: de momento, un aviso.
             composable(Routes.MULTIVIEW) { ComingSoonScreen(nav, insets, "Multipantalla", phase = 5, detail = true) }
-            composable(Routes.VPN) { ComingSoonScreen(nav, insets, "VPN", phase = 5, detail = true) }
+            composable(Routes.VPN) { VpnScreen(nav, insets) }
             composable(Routes.SETTINGS) { ComingSoonScreen(nav, insets, "Ajustes", phase = 5, detail = true) }
         }
     }

@@ -37,13 +37,15 @@ fun TopBar(
     modifier: Modifier = Modifier,
     showBack: Boolean = false,
     showActions: Boolean = true,
+    /** Qué hace la flecha atrás; por defecto, volver a la pantalla anterior. */
+    onBack: (() -> Unit)? = null,
 ) {
     Row(
         modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (showBack) IconCircleButton(Icons.AutoMirrored.Rounded.ArrowBack, "Atrás", onClick = { nav.back() })
+        if (showBack) IconCircleButton(Icons.AutoMirrored.Rounded.ArrowBack, "Atrás", onClick = { onBack?.invoke() ?: nav.back() })
         LText(title, style = Lumen.type.largeTitle, maxLines = 1, modifier = Modifier.weight(1f))
         if (showActions) {
             VpnPill(onClick = { nav.go(Routes.VPN) })
