@@ -1,10 +1,14 @@
 package app.lumentv.ui.components
 
 import androidx.annotation.OptIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -13,6 +17,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import app.lumentv.data.settings.ResizeMode
+import app.lumentv.ui.theme.Lumen
 
 /**
  * Vídeo de ExoPlayer sin controles nativos (los controles se dibujan en Compose). Igual que en la
@@ -54,5 +59,18 @@ fun LoadingSpinner(modifier: Modifier = Modifier) {
         color = Color.White,
         trackColor = Color.White.copy(alpha = 0.2f),
         strokeWidth = 3.dp,
+    )
+}
+
+/** Aviso sobre un vídeo pequeño mientras reconecta (`StreamReconnect`, compartido con la TV). */
+@Composable
+fun ReconnectPill(attempt: Int, modifier: Modifier = Modifier) {
+    LText(
+        "Reconectando ($attempt/$STREAM_MAX_RETRIES)",
+        style = Lumen.type.caption,
+        color = Color.White,
+        maxLines = 1,
+        modifier = modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.7f))
+            .padding(horizontal = 12.dp, vertical = 5.dp),
     )
 }

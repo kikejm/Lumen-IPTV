@@ -69,7 +69,7 @@ import app.lumentv.ui.screens.vod.MovieDetailScreen
 import app.lumentv.ui.screens.vod.MoviesScreen
 import app.lumentv.ui.screens.vod.SeriesDetailScreen
 import app.lumentv.ui.screens.vod.SeriesScreen
-import app.lumentv.ui.screens.placeholder.ComingSoonScreen
+import app.lumentv.ui.screens.multiview.MultiViewScreen
 import app.lumentv.ui.screens.playlist.PlaylistEditScreen
 import app.lumentv.ui.screens.settings.SPEED_TEST_ROUTE
 import app.lumentv.ui.screens.settings.SettingsScreen
@@ -156,8 +156,7 @@ private fun MobileNavHost(startOnboarding: Boolean) {
                 SeriesDetailScreen(nav, insets, it.arguments?.getString("id").orEmpty())
             }
             composable(Routes.PLAYER) { PlayerScreen(nav, insets) }
-            // Pendiente de la fase 5 del plan: de momento, un aviso.
-            composable(Routes.MULTIVIEW) { ComingSoonScreen(nav, insets, "Multipantalla", phase = 5, detail = true) }
+            composable(Routes.MULTIVIEW) { MultiViewScreen(nav, insets) }
             composable(Routes.VPN) { VpnScreen(nav, insets) }
             composable(Routes.SETTINGS) { SettingsScreen(nav, insets) }
             composable(SPEED_TEST_ROUTE) { SpeedTestScreen(nav, insets) }
