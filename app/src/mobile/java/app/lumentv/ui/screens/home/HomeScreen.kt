@@ -104,7 +104,7 @@ fun HomeScreen(nav: Navigator, insets: PaddingValues) {
     val settings by graph.settings.settings.collectAsState()
     val sync by graph.catalog.syncState.collectAsState()
     val vpn by graph.vpn.state.collectAsState()
-    val update by graph.availableUpdate.collectAsState()
+    val update by graph.updateNotice.collectAsState()
     val installer = rememberUpdateInstaller()
     val pid = playlist?.id ?: -1L
 
@@ -181,7 +181,7 @@ fun HomeScreen(nav: Navigator, insets: PaddingValues) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         TopBar(nav, "IPTV")
-        update?.let { UpdateBanner(it, installer) }
+        update?.let { UpdateBanner(it, installer, onDismiss = graph::dismissUpdateNotice) }
         when (widthClass) {
             // Vertical: una columna (Stitch 01-inicio).
             WidthClass.Compact -> {

@@ -2,6 +2,9 @@ package app.lumentv.di
 
 import android.app.Application
 import android.util.Log
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import app.lumentv.BuildConfig
 import app.lumentv.core.crypto.SecretBox
 import app.lumentv.core.net.isMeteredNetwork
@@ -28,7 +31,12 @@ import app.lumentv.vpn.VpnManager
 import app.lumentv.vpn.VpnServerRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,8 +98,24 @@ class AppGraph(val app: Application) {
     val speedTest = SpeedTest(http)
     val importServer = ImportServer(appScope, json)
 
+    /** Versión nueva publicada y aún sin instalar. Se guarda en Ajustes: sobrevive a cerrar la app. */
     private val _availableUpdate = MutableStateFlow<UpdateInfo?>(null)
     val availableUpdate: StateFlow<UpdateInfo?> = _availableUpdate.asStateFlow()
+
+    /** versionCode cuyo aviso se ha ocultado en esta visita (0 = ninguno). Vuelve a 0 al entrar en la app. */
+    private val dismissedUpdate = MutableStateFlow(0)
+
+    /** Lo que muestra el aviso de Inicio: la versión pendiente, salvo que se haya ocultado en esta visita. */
+    val updateNotice: StateFlow<UpdateInfo?> = combine(_availableUpdate, dismissedUpdate) { info, dismissed ->
+        info?.takeIf { it.versionCode != dismissed }
+    }.stateIn(appScope, SharingStarted.Eagerly, null)
+
+    /** Oculta el aviso hasta la próxima vez que se entre en la app (Ajustes sigue ofreciendo instalarla). */
+    fun dismissUpdateNotice() {
+        dismissedUpdate.value = _availableUpdate.value?.versionCode ?: 0
+    }
+
+    private var foregroundUpdateChecks: Job? = null
 
     /** Lo que hace el servidor de importación cuando el móvil envía datos. */
     val importHandler = object : ImportHandler {
@@ -133,6 +157,8 @@ class AppGraph(val app: Application) {
     }
 
     fun onAppStart() {
+        watchForegroundForUpdates()
+        appScope.launch { restorePendingUpdate() }
         appScope.launch {
             runCatching { vpnServers.importBundled() }.onFailure { Log.w(TAG, "Configs VPN empaquetadas", it) }
             db.programs().runCatching { deleteOlderThan(System.currentTimeMillis() - 2 * 24 * 3_600_000L) }
@@ -147,8 +173,45 @@ class AppGraph(val app: Application) {
                 if (p.id in upgraded || catalog.needsSync(p, s.autoRefreshHours)) syncPlaylist(p.id)
                 else if (epg.needsSync(p)) runCatching { epg.sync(p) }
             }
-            checkForUpdates(force = false)
         }
+    }
+
+    /**
+     * Mientras la app está a la vista busca versiones nuevas al entrar y cada [UPDATE_POLL_MS]; así una
+     * versión publicada aparece al poco rato. Cada vez que se vuelve a la app el aviso reaparece aunque
+     * se hubiera ocultado. Debe llamarse desde el hilo principal.
+     */
+    private fun watchForegroundForUpdates() {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                dismissedUpdate.value = 0
+                foregroundUpdateChecks?.cancel()
+                foregroundUpdateChecks = appScope.launch {
+                    while (true) {
+                        checkForUpdates(force = false)
+                        delay(UPDATE_POLL_MS)
+                    }
+                }
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
+                foregroundUpdateChecks?.cancel()
+                foregroundUpdateChecks = null
+            }
+        })
+    }
+
+    /** Recupera el aviso guardado (sin red), salvo que esa versión ya esté instalada. */
+    private suspend fun restorePendingUpdate() {
+        val saved = settings.load().pendingUpdate
+        if (saved.isBlank()) return
+        val info = runCatching { json.decodeFromString(UpdateInfo.serializer(), saved) }.getOrNull()
+        if (info == null || !info.isNewer) {
+            settings.setPendingUpdate("")
+            return
+        }
+        // Si la comprobación por red ya ha contestado, su resultado manda.
+        _availableUpdate.compareAndSet(null, info)
     }
 
     suspend fun syncPlaylist(id: Long) {
@@ -160,15 +223,24 @@ class AppGraph(val app: Application) {
     suspend fun checkForUpdates(force: Boolean): Result<UpdateInfo?> {
         if (!updater.isConfigured) return Result.success(null)
         val s = settings.load()
-        if (!force && System.currentTimeMillis() - s.lastUpdateCheck < 12 * 3_600_000L) return Result.success(_availableUpdate.value)
+        if (!force && System.currentTimeMillis() - s.lastUpdateCheck < UPDATE_MIN_GAP_MS) return Result.success(_availableUpdate.value)
+        // Sin red se conserva el aviso que hubiera: solo una respuesta correcta lo quita.
         return runCatching { updater.check() }
             .onSuccess { info ->
                 settings.setLastUpdateCheck(System.currentTimeMillis())
-                _availableUpdate.value = info?.takeIf { it.isNewer }
+                val pending = info?.takeIf { it.isNewer }
+                _availableUpdate.value = pending
+                settings.setPendingUpdate(pending?.let { json.encodeToString(UpdateInfo.serializer(), it) }.orEmpty())
             }
+            .onFailure { Log.w(TAG, "Buscar actualizaciones", it) }
     }
 
     private companion object {
         const val TAG = "AppGraph"
+
+        // GitHub permite 60 consultas por hora y red sin token, y cada comprobación gasta 2: con la TV y
+        // el móvil en la misma casa, cada 15 min (y no más de una cada 10 al entrar y salir) cabe de sobra.
+        const val UPDATE_POLL_MS = 15 * 60_000L
+        const val UPDATE_MIN_GAP_MS = 10 * 60_000L
     }
 }

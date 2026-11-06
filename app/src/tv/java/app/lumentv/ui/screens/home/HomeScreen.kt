@@ -90,7 +90,7 @@ fun HomeScreen(nav: Navigator) {
     val playlist by graph.playlists.active.collectAsState(initial = null)
     val settings by graph.settings.settings.collectAsState()
     val sync by graph.catalog.syncState.collectAsState()
-    val update by graph.availableUpdate.collectAsState()
+    val update by graph.updateNotice.collectAsState()
     val pid = playlist?.id ?: -1L
 
     val history by remember(pid) { graph.library.history(pid, 12) }.collectAsState(initial = emptyList())
@@ -124,12 +124,17 @@ fun HomeScreen(nav: Navigator) {
         ) {
             item { TopBar(nav, Routes.HOME) }
 
+            // Aviso de versión nueva: OK lleva a Ajustes para instalarla; «Ocultar» lo quita hasta la próxima
+            // vez que se abra la app.
             if (update != null) item {
-                FocusSurface(onClick = { nav.go(Routes.SETTINGS) }, containerColor = c.accent.copy(alpha = 0.18f), modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Rounded.SystemUpdate, contentDescription = null, tint = c.accent)
-                        LText("Actualización disponible: IPTV ${update?.versionName}. Pulsa para instalarla.", style = Lumen.type.callout)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    FocusSurface(onClick = { nav.go(Routes.SETTINGS) }, containerColor = c.accent.copy(alpha = 0.18f), modifier = Modifier.weight(1f)) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(Icons.Rounded.SystemUpdate, contentDescription = null, tint = c.accent)
+                            LText("Actualización disponible: IPTV ${update?.versionName}. Pulsa para instalarla.", style = Lumen.type.callout)
+                        }
                     }
+                    PillButton("Ocultar", onClick = graph::dismissUpdateNotice)
                 }
             }
 
