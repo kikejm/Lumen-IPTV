@@ -4,10 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -58,6 +60,7 @@ import kotlinx.coroutines.launch
  * táctil. En vertical, una columna; en horizontal, explicación a la izquierda y formulario a la
  * derecha. Los campos sobreviven a la rotación (`rememberSaveable`).
  */
+@kotlin.OptIn(ExperimentalLayoutApi::class) // consumeWindowInsets
 @Composable
 fun PlaylistEditScreen(nav: Navigator, insets: PaddingValues, playlistId: Long?, isOnboarding: Boolean) {
     val graph = LocalGraph.current
@@ -175,7 +178,8 @@ fun PlaylistEditScreen(nav: Navigator, insets: PaddingValues, playlistId: Long?,
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(insets).imePadding()) {
+    // consumeWindowInsets: imePadding solo añade lo que el teclado sobresale de la barra de navegación.
+    Column(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets).imePadding()) {
         if (!isOnboarding) Box(Modifier.padding(horizontal = 16.dp)) { TopBar(nav, "", showBack = true, showActions = false) }
         if (wide) {
             Row(

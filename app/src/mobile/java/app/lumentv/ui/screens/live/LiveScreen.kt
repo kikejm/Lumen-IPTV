@@ -3,6 +3,7 @@ package app.lumentv.ui.screens.live
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -65,6 +66,7 @@ import app.lumentv.player.PlayerFactory
 import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.catchupRoute
 import app.lumentv.ui.adaptive.WidthClass
+import app.lumentv.ui.adaptive.isCompactHeight
 import app.lumentv.ui.components.Artwork
 import app.lumentv.ui.components.EPG_ROW_DELAY_MS
 import app.lumentv.ui.components.EmptyState
@@ -230,7 +232,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
             QualityChips(if (quality in qualities) qualities else qualities + quality, quality, vm::setQuality)
         }
     }
-    val channelList: @Composable (Modifier) -> Unit = { modifier ->
+    val channelList: @Composable (Modifier, Boolean) -> Unit = { modifier, showNumbers ->
         ChannelList(
             channels = channels,
             playlist = playlist,
@@ -251,11 +253,42 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
             resetKey = selected to quality,
             onTap = ::tapChannel,
             onMenu = { channelMenu = it },
+            showNumbers = showNumbers,
             modifier = modifier,
         )
     }
 
-    Column(Modifier.fillMaxSize().padding(insets)) {
+    if (isCompactHeight() && widthClass != WidthClass.Compact) {
+        // Móvil en horizontal (≈ 340 dp de alto). Una barra superior a todo el ancho y tres columnas
+        // dejaban la previsualización en un sello. Aquí la barra va solo sobre los canales, las
+        // categorías en píldoras, y la previsualización ocupa la derecha desde arriba, tan grande
+        // como quepa dejando a la vista lo que se emite y al menos LANDSCAPE_LIST_MIN a la lista.
+        BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {
+            val previewWidth = minOf(
+                (maxHeight - LANDSCAPE_BELOW_PREVIEW) * (16f / 9f),
+                maxWidth * 0.62f,
+                maxWidth - LANDSCAPE_LIST_MIN - LANDSCAPE_GAP - 16.dp,
+            ).coerceAtLeast(0.dp)
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Box(Modifier.padding(start = 16.dp)) { TopBar(nav, "Directo", compact = true) }
+                    categoryChips()
+                    qualityChips()
+                    // Sin el número del canal: la columna es estrecha y el nombre necesita el sitio.
+                    channelList(Modifier.weight(1f), false)
+                }
+                Column(
+                    Modifier.padding(start = LANDSCAPE_GAP, end = 16.dp).width(previewWidth).fillMaxHeight()
+                        .verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    previewBox(Modifier.fillMaxWidth())
+                    // El nombre del canal ya va sobre el vídeo.
+                    ProgramPanel(preview, programs, fmt, showChannel = false)
+                }
+            }
+        }
+    } else Column(Modifier.fillMaxSize().padding(insets)) {
         Box(Modifier.padding(horizontal = 16.dp)) { TopBar(nav, "TV en directo") }
         when (widthClass) {
             WidthClass.Compact -> Column(Modifier.weight(1f)) {
@@ -266,13 +299,13 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
                 Gap(height = 10.dp)
                 categoryChips()
                 qualityChips()
-                channelList(Modifier.weight(1f))
+                channelList(Modifier.weight(1f), true)
             }
             WidthClass.Medium -> Row(Modifier.weight(1f).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(0.4f).fillMaxHeight()) {
                     categoryChips()
                     qualityChips()
-                    channelList(Modifier.weight(1f))
+                    channelList(Modifier.weight(1f), true)
                 }
                 Column(Modifier.weight(0.6f).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     previewBox(Modifier.fillMaxWidth())
@@ -283,7 +316,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
                 CategoryColumn(categories, selected, onSelect = ::select, onMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) categoryMenu = it }, modifier = Modifier.width(220.dp).fillMaxHeight())
                 Column(Modifier.width(360.dp).fillMaxHeight()) {
                     qualityChips()
-                    channelList(Modifier.weight(1f))
+                    channelList(Modifier.weight(1f), true)
                 }
                 Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     previewBox(Modifier.fillMaxWidth())
@@ -342,6 +375,14 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         )
     }
 }
+
+/** Móvil en horizontal: alto que se deja bajo la previsualización (la línea de lo que se emite). */
+private val LANDSCAPE_BELOW_PREVIEW = 56.dp
+
+/** Móvil en horizontal: ancho mínimo de la columna de canales (cabe la barra con «Directo»). */
+private val LANDSCAPE_LIST_MIN = 300.dp
+
+private val LANDSCAPE_GAP = 12.dp
 
 /** Previsualización 16:9: el vídeo debajo y el toque encima (nunca el vídeo dentro de la superficie). */
 @Composable
@@ -411,11 +452,11 @@ private fun NowLine(channel: ChannelEntity?, now: Program?, fmt: TimeFormatter) 
 
 /** EPG del canal que suena: ahora (con progreso y sinopsis) y a continuación. */
 @Composable
-private fun ProgramPanel(channel: ChannelEntity?, programs: List<Program>, fmt: TimeFormatter) {
+private fun ProgramPanel(channel: ChannelEntity?, programs: List<Program>, fmt: TimeFormatter, showChannel: Boolean = true) {
     val c = Lumen.colors
     if (channel == null) return
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        LText(channel.name, style = Lumen.type.headline, maxLines = 1)
+        if (showChannel) LText(channel.name, style = Lumen.type.headline, maxLines = 1)
         if (programs.isEmpty()) LText("Sin información de programación", style = Lumen.type.body, color = c.textSecondary)
         programs.forEachIndexed { i, prog ->
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -501,6 +542,7 @@ private fun ChannelList(
     resetKey: Any,
     onTap: (List<ChannelEntity>, Int) -> Unit,
     onMenu: (ChannelEntity) -> Unit,
+    showNumbers: Boolean,
     modifier: Modifier,
 ) {
     if (channels.isEmpty()) {
@@ -525,6 +567,7 @@ private fun ChannelList(
                 isFavorite = ch.streamId in favorites,
                 isPreviewing = ch.streamId == previewId,
                 fmt = fmt,
+                showNumber = showNumbers,
                 onClick = { onTap(channels, index) },
                 onMenu = { onMenu(ch) },
             )
@@ -539,6 +582,7 @@ private fun ChannelRow(
     isFavorite: Boolean,
     isPreviewing: Boolean,
     fmt: TimeFormatter,
+    showNumber: Boolean,
     onClick: () -> Unit,
     onMenu: () -> Unit,
 ) {
@@ -557,7 +601,7 @@ private fun ChannelRow(
         color = if (isPreviewing) c.surfaceElevated else Color.Transparent,
     ) {
         Row(Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            LText(channel.num.toString(), style = Lumen.type.caption, color = c.textTertiary, modifier = Modifier.width(24.dp))
+            if (showNumber) LText(channel.num.toString(), style = Lumen.type.caption, color = c.textTertiary, modifier = Modifier.width(24.dp))
             Artwork(channel.logo, channel.name, Modifier.size(width = 52.dp, height = 34.dp), radius = 6.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
