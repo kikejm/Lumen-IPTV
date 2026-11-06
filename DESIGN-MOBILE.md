@@ -89,7 +89,8 @@ Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale 
 - **Toque** = OK de la TV. **Pulsación larga** = ☰ de la TV, y **siempre** hay también un botón «⋯» visible con las mismas opciones.
 - Reproductor: toque muestra/oculta controles; deslizar vertical a la izquierda = brillo, a la derecha = volumen; doble toque a los lados = ±10 s (VOD); deslizar horizontal en directo = canal anterior/siguiente; candado para bloquear toques.
 - **Girar el móvil** en el reproductor entra o sale de pantalla completa **sin cortar el vídeo**. El botón de pantalla completa fuerza horizontal y lo libera al salir.
-- Al salir del reproductor con algo sonando: **mini reproductor** de 64 dp sobre la barra inferior (vídeo, canal, pausa, cerrar). Al salir de la app: PiP automático (Android 12+) si está activo en Ajustes.
+- Al salir del reproductor con algo sonando: **mini reproductor** de 64 dp sobre la barra inferior (vídeo, canal, pausa, cerrar). Al salir de la app: PiP automático (Android 12+) si está activo en Ajustes; si no hay PiP, todo se pausa y se reanuda al volver. Cerrar la ventana PiP deja el vídeo en pausa.
+- Foco de audio: el vídeo se pausa con una llamada y no suena encima de otras apps.
 - Reconexión del reproductor igual que en TV: 5 intentos cada 3 s, última imagen congelada y píldora «Error de reproducción, vuelve a conectar en 3 s (1/5)»; agotados, panel con «Reintentar» / «Otro canal» / «Volver».
 - Multipantalla: 2 vídeos en móvil (apilados en vertical, lado a lado en horizontal) y 4 en tableta. Tocar un vídeo le da el audio (anillo blanco); pulsación larga o «⋯» = cambiar canal, ampliar, quitar. Reconexión como en la TV (`StreamReconnect`).
 - VPN: los `.conf` se importan con el selector de ficheros, una URL o «Abrir con»/«Compartir» desde otra app; tras importar se muestra el resultado en la pantalla VPN.

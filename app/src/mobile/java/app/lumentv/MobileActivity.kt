@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import app.lumentv.ui.MobileRoot
 import app.lumentv.ui.screens.vpn.ConfImport
@@ -72,6 +73,27 @@ class MobileActivity : ComponentActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         isInPip = isInPictureInPictureMode
+        // Sale de PiP estando parada: el usuario ha cerrado la ventana (X o arrastrándola), no la ha ampliado.
+        if (!isInPictureInPictureMode && lifecycle.currentState == Lifecycle.State.CREATED) pipClosed = true
+    }
+
+    /** Se cerró la ventana PiP: al volver a la app, el vídeo sigue en pausa. */
+    private var pipClosed = false
+
+    /**
+     * Sin `MediaSession` ni servicio no hay controles fuera de la app: si no se ve (Inicio sin PiP,
+     * otra app, pantalla apagada o ventana PiP cerrada), nada debe sonar. Entrar en PiP no llega
+     * aquí (la Activity sigue visible); cerrar la ventana PiP, sí.
+     */
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) graph.players.enterBackground()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        graph.players.enterForeground(resume = !pipClosed)
+        pipClosed = false
     }
 
     private var vpnPermissionCallback: ((Boolean) -> Unit)? = null

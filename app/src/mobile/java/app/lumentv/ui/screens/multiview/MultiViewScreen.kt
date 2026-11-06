@@ -113,7 +113,12 @@ fun MultiViewScreen(nav: Navigator, insets: PaddingValues) {
             players[i].prepare()
         }
     }
-    LaunchedEffect(audioSlot) { players.forEachIndexed { i, p -> p.volume = if (i == audioSlot) 1f else 0f } }
+    LaunchedEffect(audioSlot) {
+        players.forEachIndexed { i, p -> p.volume = if (i == audioSlot) 1f else 0f }
+        // Foco de audio solo para el que suena: primero lo sueltan los demás.
+        players.forEachIndexed { i, p -> if (i != audioSlot) graph.players.setAudioFocus(p, false) }
+        graph.players.setAudioFocus(players[audioSlot], true)
+    }
     BackHandler(enabled = expandedSlot != null) { expandedSlot = null }
 
     fun load(slot: Int, ch: ChannelEntity) {

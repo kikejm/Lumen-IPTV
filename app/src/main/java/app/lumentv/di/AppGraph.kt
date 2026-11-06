@@ -81,7 +81,7 @@ class AppGraph(val app: Application) {
 
     val playback = PlaybackSession()
     val streams = StreamResolver(playlists, xtream, settings)
-    val players = PlayerFactory(app, http, settings)
+    val players = PlayerFactory(app, http, settings, handleAudioFocus = BuildConfig.FLAVOR == "mobile")
 
     val vpnServers = VpnServerRepository(app, db, secretBox, http)
     val vpn = VpnManager(app, vpnServers, settings, appScope, http, json)
