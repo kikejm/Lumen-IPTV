@@ -27,9 +27,15 @@ Proton .conf ──▶ VpnServerRepository (cifrado) ──▶ VpnManager ──
 
 ## Mapa del código
 
-Todo cuelga de `app/src/main/java/app/lumentv/`.
+El módulo `:app` tiene dos sabores (`productFlavors`, dimensión `device`):
 
-- `LumenApp`, `MainActivity` — punto de entrada. `MainActivity` es la única Activity: aloja Compose, pide el permiso de VPN (`ensureVpnPermission`) y cierra la app al salir con la tecla Inicio (no hay Picture-in-Picture).
+- `src/main` — núcleo compartido: todo lo de abajo salvo la UI, más los tokens del tema (`ui/theme/Theme.kt`), las rutas (`ui/navigation`), los ViewModels (`LiveViewModel`, `VodViewModels`) y la lógica de reconexión de vídeos pequeños (`ui/components/StreamReconnect`; cada UI dibuja su `ReconnectPill`).
+- `src/tv` — `MainActivity` y la UI de Compose for TV (`ui/components`, `ui/screens`, `LumenRoot`, `Launch.kt`, `LumenTheme`). `applicationId` `app.lumentv`.
+- `src/mobile` — `MobileActivity` y la UI táctil con Material 3 (en desarrollo, `docs/PLAN-MOVIL.md`; diseño en `DESIGN-MOBILE.md`). `MobileRoot` (NavHost + barra inferior o raíl según `ui/adaptive/WidthClass`), `ui/components` (táctiles: `TapSurface`, hojas, filas de ajustes, campos) y `ui/screens`. Los `.conf` llegan por el selector de ficheros o por «Abrir con»/«Compartir» (`MobileActivity.importShared` → `screens/vpn/ConfImport`); el `ImportServer` no se usa en el móvil. `applicationId` `app.lumentv.mobile`.
+
+Los paquetes Kotlin son los mismos en los tres; lo de abajo cuelga de `app/src/<sabor>/java/app/lumentv/`.
+
+- `LumenApp` (main), `MainActivity` (tv) / `MobileActivity` (mobile) — punto de entrada. Cada sabor tiene una sola Activity. Las dos alojan Compose y piden el permiso de VPN (`ensureVpnPermission`). La de TV cierra la app al salir con la tecla Inicio (no hay Picture-in-Picture); la del móvil entra en Picture-in-Picture al salir si suena algo.
 - `di/AppGraph` — el grafo de dependencias, construido a mano una sola vez. También orquesta el arranque (`onAppStart`: importar `.conf` empaquetados, refrescar catálogo/EPG caducados, buscar actualizaciones) y `syncPlaylist`.
 - `core/` — utilidades sin dependencias de dominio: `SecretBox` (AES-GCM con clave del Android Keystore), formateo de horas, tamaños, banderas.
 - `data/settings` — `SettingsRepository` (DataStore Preferences → `StateFlow<AppSettings>`) y `ParentalControl` (PIN con hash + categorías bloqueadas).
@@ -44,7 +50,7 @@ Todo cuelga de `app/src/main/java/app/lumentv/`.
 - `remote/ImportServer` — servidor HTTP mínimo en la LAN con página web para subir `.conf` y dar de alta listas desde el móvil.
 - `update/UpdateManager` — OTA: GitHub Releases o manifiesto JSON, descarga con verificación SHA-256 e instalación vía `FileProvider`.
 - `tools/SpeedTest` — test de descarga y latencia.
-- `ui/` — Compose for TV. `theme/` (tokens), `components/` (piezas reutilizables, todas enfocables), `navigation/` (rutas, `Navigator`, `LocalGraph`), `LumenRoot` (NavHost), `Launch.kt` (arrancar reproducción, reanudar historial, tecla ☰) y `screens/<pantalla>/`.
+- `ui/` — `theme/Theme.kt` y `navigation/` compartidos; el resto es del sabor. En `tv`: Compose for TV, `theme/` (tokens), `components/` (piezas reutilizables, todas enfocables), `navigation/` (rutas, `Navigator`, `LocalGraph`), `LumenRoot` (NavHost), `Launch.kt` (arrancar reproducción, reanudar historial, tecla ☰) y `screens/<pantalla>/`.
 
 Fuera del código:
 

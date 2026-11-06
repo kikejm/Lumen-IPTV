@@ -1,7 +1,6 @@
 package app.lumentv.ui.theme
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -12,10 +11,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.LocalContentColor
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.darkColorScheme
 import app.lumentv.R
+
+/*
+ * Tokens compartidos por las dos UIs (TV y móvil). El composable `LumenTheme`
+ * vive en cada sabor: `src/tv` (Compose for TV) y `src/mobile` (Material 3).
+ */
 
 /**
  * Tokens de color de Lumen (ver DESIGN.md). Inspirados en los colores de sistema de Apple:
@@ -90,22 +91,4 @@ val LocalLumenType = staticCompositionLocalOf { LumenType() }
 object Lumen {
     val colors: LumenColors @Composable get() = LocalLumenColors.current
     val type: LumenType @Composable get() = LocalLumenType.current
-}
-
-@Composable
-fun LumenTheme(content: @Composable () -> Unit) {
-    val colors = DarkLumenColors
-    val scheme = darkColorScheme(
-        primary = colors.accent, onPrimary = colors.onAccent,
-        background = colors.background, onBackground = colors.textPrimary,
-        surface = colors.surface, onSurface = colors.textPrimary,
-        surfaceVariant = colors.surfaceElevated, onSurfaceVariant = colors.textSecondary,
-        border = colors.focusRing, error = colors.danger,
-    )
-    CompositionLocalProvider(LocalLumenColors provides colors, LocalLumenType provides LumenType()) {
-        MaterialTheme(colorScheme = scheme) {
-            // Fuera de una Surface el color de contenido por defecto sería negro: lo fijamos al primario.
-            CompositionLocalProvider(LocalContentColor provides colors.textPrimary, content = content)
-        }
-    }
 }

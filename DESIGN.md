@@ -108,6 +108,8 @@ components:
 
 Diseño fuente en **Google Stitch**: proyecto «Lumen TV — IPTV para Fire TV» (id `16620154609208606606`). Las capturas exportadas están en `design/stitch/`. Los tokens de arriba son la referencia normativa; en código viven en `app/src/main/java/app/lumentv/ui/theme/Theme.kt` (`LumenColors`, `LumenType`, `LumenDimens`). Si cambias uno, cambia el otro.
 
+Este documento describe la UI de **TV** (sabor `tv`). La versión móvil (sabor `mobile`) comparte estos tokens de color y tipografía, pero sus reglas táctiles y de orientación están en `DESIGN-MOBILE.md` (proyecto Stitch «IPTV — Android móvil», id `11739808551864426596`) y en `docs/PLAN-MOVIL.md`.
+
 ## Overview
 
 Lumen es una app de TV que se usa **a 3 metros y solo con el mando del Fire TV** (flechas, OK, Atrás, ☰, Inicio). La referencia es Apple tvOS / app Apple TV:

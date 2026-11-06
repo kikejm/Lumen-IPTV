@@ -49,8 +49,6 @@ android {
 
     defaultConfig {
         applicationId = "app.lumentv"
-        minSdk = 25 // Fire OS 6 (Android 7.1). Fire OS 7 = API 28, Fire OS 8 = API 30.
-        targetSdk = 34
         versionCode = lumenVersionCode
         versionName = lumenVersionName
 
@@ -65,6 +63,27 @@ android {
         buildConfigField("String", "UPDATE_MANIFEST_URL", env("LUMEN_UPDATE_MANIFEST_URL").asBuildConfigString())
         buildConfigField("String", "SPEEDTEST_URL", env("LUMEN_SPEEDTEST_URL", "https://speed.cloudflare.com/__down?bytes=25000000").asBuildConfigString())
         buildConfigField("int", "IMPORT_SERVER_PORT", env("LUMEN_IMPORT_SERVER_PORT", "8765"))
+    }
+
+    // Dos UIs sobre el mismo núcleo (datos, VPN, reproductor): ver docs/PLAN-MOVIL.md.
+    // El sabor `tv` conserva el applicationId `app.lumentv`: cambiarlo rompería las
+    // actualizaciones del Fire TV. Ambos sabores se firman con el mismo keystore.
+    flavorDimensions += "device"
+    productFlavors {
+        create("tv") {
+            dimension = "device"
+            minSdk = 25 // Fire OS 6 (Android 7.1). Fire OS 7 = API 28, Fire OS 8 = API 30.
+            targetSdk = 34
+        }
+        create("mobile") {
+            dimension = "device"
+            applicationIdSuffix = ".mobile"
+            minSdk = 26
+            targetSdk = 35
+            // Sin OTA hasta la fase 6: el canal de actualizaciones actual publica el APK de TV.
+            buildConfigField("String", "UPDATE_GITHUB_REPO", "\"\"")
+            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
+        }
     }
 
     signingConfigs {
@@ -137,7 +156,8 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material.icons)
-    implementation(libs.tv.material)
+    "tvImplementation"(libs.tv.material)
+    "mobileImplementation"(libs.compose.material3)
     implementation(libs.navigation.compose)
     debugImplementation(libs.compose.ui.tooling)
 

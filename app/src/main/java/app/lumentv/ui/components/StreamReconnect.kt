@@ -1,8 +1,5 @@
 package app.lumentv.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -14,13 +11,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import app.lumentv.ui.theme.Lumen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,6 +21,11 @@ import kotlinx.coroutines.launch
 const val STREAM_MAX_RETRIES = 5
 private const val STREAM_RETRY_DELAY_MS = 3_000L
 private const val STREAM_STALL_TIMEOUT_MS = 20_000L
+
+/*
+ * Lógica compartida por la TV y el móvil (solo Compose runtime y Media3). El aviso que se dibuja
+ * encima, `ReconnectPill`, es de cada UI.
+ */
 
 /**
  * Reconexión de los directos que se ven en pequeño (previsualización y multipantalla), con los mismos límites que
@@ -81,19 +78,6 @@ class StreamReconnect internal constructor(
         attempt = 0
         failed = false
     }
-}
-
-/** Aviso sobre un vídeo pequeño mientras reconecta. */
-@Composable
-fun ReconnectPill(attempt: Int, modifier: Modifier = Modifier) {
-    LText(
-        "Reconectando ($attempt/$STREAM_MAX_RETRIES)",
-        style = Lumen.type.caption,
-        color = Color.White,
-        maxLines = 1,
-        modifier = modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.7f))
-            .padding(horizontal = 12.dp, vertical = 5.dp),
-    )
 }
 
 /** `isActive`: si es `false`, los fallos los gestiona otro (TV en directo a pantalla completa). `reload`: vuelve a abrir el stream. */

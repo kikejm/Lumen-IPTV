@@ -49,13 +49,13 @@ jobs:
           LUMEN_KEY_ALIAS: ${{ secrets.LUMEN_KEY_ALIAS }}
           LUMEN_KEY_PASSWORD: ${{ secrets.LUMEN_KEY_PASSWORD }}
           LUMEN_UPDATE_GITHUB_TOKEN: ${{ secrets.LUMEN_UPDATE_GITHUB_TOKEN }}
-        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+        run: ./gradlew --no-daemon testTvDebugUnitTest assembleTvRelease
 
       - name: Empaquetar artefactos
         run: |
           mkdir -p release
           APK="release/lumen-${VERSION_NAME}.apk"
-          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          cp app/build/outputs/apk/tv/release/app-tv-release.apk "$APK"
           SHA=$(sha256sum "$APK" | cut -d' ' -f1)
           NOTES=$(git log -1 --pretty=%B | head -c 2000)
           jq -n \
