@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -71,16 +72,22 @@ fun PlaylistEditScreen(nav: Navigator, insets: PaddingValues, playlistId: Long?,
     var name by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_PLAYLIST_NAME) }
     var server by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_XTREAM_SERVER) }
     var user by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_XTREAM_USERNAME) }
-    var pass by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_XTREAM_PASSWORD) }
+    // La contraseña no va al estado guardado (Android lo escribe en disco en claro si cierra la app).
+    var pass by remember { mutableStateOf(BuildConfig.DEFAULT_XTREAM_PASSWORD) }
     var m3u by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_M3U_URL) }
     var epg by rememberSaveable { mutableStateOf(BuildConfig.DEFAULT_EPG_URL) }
     var loaded by rememberSaveable { mutableStateOf(false) }
-    var busy by rememberSaveable { mutableStateOf(false) }
+    // No guardable: si Android cierra la app a medio comprobar, el botón no debe quedarse en «Comprobando…».
+    var busy by remember { mutableStateOf(false) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(playlistId) {
-        if (loaded) return@LaunchedEffect
         val p = playlistId?.let { graph.playlists.byId(it) } ?: return@LaunchedEffect
+        if (loaded) {
+            // Restaurado tras cerrarse la app: el resto de campos vuelve del estado guardado; la contraseña, de la lista.
+            if (pass.isEmpty()) pass = runCatching { graph.playlists.credentials(p).password }.getOrDefault("")
+            return@LaunchedEffect
+        }
         type = p.type
         name = p.name
         server = p.serverUrl
@@ -100,7 +107,8 @@ fun PlaylistEditScreen(nav: Navigator, insets: PaddingValues, playlistId: Long?,
             runCatching {
                 val id = when (type) {
                     PlaylistType.XTREAM -> graph.playlists.saveXtream(name, server, user, pass, playlistId).also { pid ->
-                        if (epg.isNotBlank()) graph.playlists.byId(pid)?.let { graph.playlists.setEpgUrl(it, epg) }
+                        // También al vaciar el campo: así se quita una EPG propia y se vuelve a la del proveedor.
+                        graph.playlists.byId(pid)?.takeIf { it.epgUrl != epg.trim() }?.let { graph.playlists.setEpgUrl(it, epg) }
                     }
                     PlaylistType.M3U -> graph.playlists.saveM3u(name, m3u, epg, playlistId)
                 }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -44,6 +45,7 @@ import app.lumentv.data.db.ContentKind
 import app.lumentv.ui.components.Artwork
 import app.lumentv.ui.components.EmptyState
 import app.lumentv.ui.components.FilterChip
+import app.lumentv.ui.components.IconCircleButton
 import app.lumentv.ui.components.LText
 import app.lumentv.ui.components.LumenTextField
 import app.lumentv.ui.components.OptionsSheet
@@ -119,10 +121,11 @@ fun SearchScreen(nav: Navigator, insets: PaddingValues) {
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                             radius = LumenDimens.radiusSmall,
                         ) {
-                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.padding(start = 10.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Artwork(ch.logo, ch.name, Modifier.size(width = 52.dp, height = 34.dp), radius = 6.dp)
                                 LText(ch.name, style = Lumen.type.callout, maxLines = 1, modifier = Modifier.weight(1f))
                                 if (ch.streamId in favorites) Icon(Icons.Rounded.Favorite, contentDescription = "Favorito", tint = c.accent, modifier = Modifier.size(16.dp))
+                                IconCircleButton(Icons.Rounded.MoreVert, "Opciones de ${ch.name}", onClick = { channelMenu = ch }, color = Color.Transparent)
                             }
                         }
                     }

@@ -1,14 +1,20 @@
 package app.lumentv
 
+import android.app.PendingIntent
 import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
-import android.os.Build
-import android.util.Rational
+import android.graphics.drawable.Icon
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -17,11 +23,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.Player
 import app.lumentv.ui.MobileRoot
 import app.lumentv.ui.screens.vpn.ConfImport
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
@@ -48,14 +57,60 @@ class MobileActivity : ComponentActivity() {
     val supportsPip: Boolean
         get() = packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
 
+    /**
+     * Reproductor a pantalla completa (lo pone `PlayerScreen`): la ventana PiP toma la proporción de
+     * su vídeo y lleva un botón de pausa/reproducir que actúa sobre él.
+     */
+    var pipPlayer: Player? = null
+        set(value) {
+            field?.removeListener(pipListener)
+            field = value
+            value?.addListener(pipListener)
+            updateAutoPip()
+        }
+
+    private val pipListener = object : Player.Listener {
+        override fun onEvents(player: Player, events: Player.Events) {
+            if (events.containsAny(Player.EVENT_PLAY_WHEN_READY_CHANGED, Player.EVENT_VIDEO_SIZE_CHANGED)) updateAutoPip()
+        }
+    }
+
+    private val pipReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            pipPlayer?.let { if (it.playWhenReady) it.pause() else it.play() }
+        }
+    }
+
     private fun pipParams(autoEnter: Boolean): PictureInPictureParams {
-        val b = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
+        val b = PictureInPictureParams.Builder().setAspectRatio(pipAspect()).setActions(pipActions())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) b.setAutoEnterEnabled(autoEnter).setSeamlessResizeEnabled(true)
         return b.build()
     }
 
+    /** Proporción del vídeo, dentro de los límites de Android para PiP (entre 1:2,39 y 2,39:1). */
+    private fun pipAspect(): Rational {
+        val size = pipPlayer?.videoSize
+        if (size == null || size.width == 0 || size.height == 0) return Rational(16, 9)
+        val ratio = (size.width * size.pixelWidthHeightRatio / size.height).coerceIn(0.42f, 2.39f)
+        return Rational((ratio * 1000).roundToInt(), 1000)
+    }
+
+    private fun pipActions(): List<RemoteAction> {
+        val player = pipPlayer ?: return emptyList()
+        val playing = player.playWhenReady
+        val intent = PendingIntent.getBroadcast(
+            this, 0, Intent(ACTION_PIP_TOGGLE).setPackage(packageName),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val label = if (playing) "Pausa" else "Reproducir"
+        val icon = Icon.createWithResource(this, if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play)
+        return listOf(RemoteAction(icon, label, label, intent))
+    }
+
     private fun updateAutoPip() {
-        if (!supportsPip || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        if (!supportsPip) return
+        // Antes de Android 12 los parámetros solo cuentan al entrar (`enterPip`) o ya dentro de PiP.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !isInPip) return
         runCatching { setPictureInPictureParams(pipParams(playerActive && graph.settings.current.pipEnabled)) }
     }
 
@@ -109,6 +164,7 @@ class MobileActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        ContextCompat.registerReceiver(this, pipReceiver, IntentFilter(ACTION_PIP_TOGGLE), ContextCompat.RECEIVER_NOT_EXPORTED)
         setContent { MobileRoot(graph) }
         if (savedInstanceState == null) {
             autoConnectVpn()
@@ -138,7 +194,7 @@ class MobileActivity : ComponentActivity() {
         setIntent(Intent(Intent.ACTION_MAIN))
         if (uris.isEmpty() && text.isNullOrBlank()) return
         // Se lee ya, mientras dura el permiso temporal sobre los ficheros que da la otra app.
-        graph.appScope.launch { ConfImport.post(ConfImport.import(applicationContext, graph, uris, text)) }
+        graph.appScope.launch { ConfImport.post(ConfImport.import(applicationContext, graph, uris, text).copy(fromOtherApp = true)) }
     }
 
     /** Pide (una sola vez) el permiso de VPN de Android y devuelve si está concedido. */
@@ -162,9 +218,15 @@ class MobileActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        runCatching { unregisterReceiver(pipReceiver) }
+        pipPlayer = null
         if (isFinishing && graph.settings.current.vpnDisconnectOnExit && graph.vpn.isConnected) {
             graph.appScope.launch { graph.vpn.disconnect() }
         }
         super.onDestroy()
+    }
+
+    private companion object {
+        const val ACTION_PIP_TOGGLE = "app.lumentv.action.PIP_TOGGLE"
     }
 }

@@ -30,7 +30,8 @@ object ConfImport {
     /** Resultado de la última importación llegada desde otra app; lo muestra la pantalla VPN. */
     val notice: StateFlow<Notice?> = _notice.asStateFlow()
 
-    data class Notice(val text: String, val error: Boolean)
+    /** `fromOtherApp`: llegó por «Abrir con»/«Compartir»; solo entonces se lleva al usuario a la pantalla VPN. */
+    data class Notice(val text: String, val error: Boolean, val fromOtherApp: Boolean = false)
 
     fun post(notice: Notice) {
         _notice.value = notice

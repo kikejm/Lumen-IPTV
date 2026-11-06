@@ -51,6 +51,9 @@ import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.play
 import app.lumentv.ui.theme.Lumen
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -69,7 +72,15 @@ fun SeriesDetailScreen(nav: Navigator, insets: PaddingValues, seriesId: String) 
     var error by remember { mutableStateOf<String?>(null) }
     var season by rememberSaveable { mutableIntStateOf(-1) }
     var isFav by remember { mutableStateOf(false) }
-    var lastWatched by remember { mutableStateOf<HistoryEntity?>(null) }
+    // Progreso de los episodios en una sola consulta que se actualiza sola (al volver del
+    // reproductor ya sale el minuto nuevo); antes eran dos consultas por episodio.
+    val episodeHistory by remember(playlist?.id) {
+        playlist?.let { p -> graph.library.history(p.id, ContentKind.EPISODE, limit = 1000).map { list -> list.associateBy { it.itemId } } }
+            ?: flowOf(emptyMap())
+    }.collectAsState(initial = emptyMap())
+    val lastWatched = remember(info, episodeHistory) {
+        info?.seasons?.values?.flatten()?.mapNotNull { episodeHistory[it.id] }?.maxByOrNull { it.watchedAt }
+    }
     val c = Lumen.colors
 
     LaunchedEffect(playlist?.id, seriesId) {
@@ -81,11 +92,10 @@ fun SeriesDetailScreen(nav: Navigator, insets: PaddingValues, seriesId: String) 
             .onFailure { Log.w("SeriesDetail", "get_series_info falló: ${it.javaClass.simpleName}: ${it.message?.take(300)}") }
             .onSuccess { si ->
                 info = si
-                val watched = si.seasons.values.flatten().mapNotNull { ep -> graph.library.historyItem(p.id, ContentKind.EPISODE, ep.id) }
-                lastWatched = watched.maxByOrNull { it.watchedAt }
                 // Última temporada vista (o la primera), salvo que ya se eligiera otra antes de girar.
                 if (season == -1) {
-                    val lastEp = lastWatched?.let { h -> si.seasons.values.flatten().firstOrNull { it.id == h.itemId } }
+                    val history = graph.library.history(p.id, ContentKind.EPISODE, limit = 1000).first().associateBy { it.itemId }
+                    val lastEp = si.seasons.values.flatten().filter { it.id in history }.maxByOrNull { history.getValue(it.id).watchedAt }
                     season = lastEp?.season ?: si.seasons.keys.firstOrNull() ?: 1
                 }
             }
@@ -124,7 +134,20 @@ fun SeriesDetailScreen(nav: Navigator, insets: PaddingValues, seriesId: String) 
             if (resume != null && resumeEps != null) {
                 val idx = resumeEps.indexOfFirst { it.id == resume.itemId }.coerceAtLeast(0)
                 val ep = resumeEps[idx]
-                PillButton("Reanudar T${ep.season} · E${ep.number}", onClick = { playEpisode(resumeEps, idx, resume.positionMs) }, icon = Icons.Rounded.PlayArrow, primary = true, modifier = Modifier.fillMaxWidth())
+                // Un episodio visto hasta el final no se «reanuda» en los créditos: se pasa al siguiente
+                // (de la misma temporada o la primera de la siguiente) o, si era el último, se vuelve a ver.
+                val finished = resume.durationMs > 0 && resume.positionMs >= resume.durationMs * 95 / 100
+                val nextSeasonEps = info?.seasons?.entries?.sortedBy { it.key }?.firstOrNull { it.key > ep.season }?.value.orEmpty()
+                when {
+                    !finished -> PillButton("Reanudar T${ep.season} · E${ep.number}", onClick = { playEpisode(resumeEps, idx, resume.positionMs) }, icon = Icons.Rounded.PlayArrow, primary = true, modifier = Modifier.fillMaxWidth())
+                    idx + 1 < resumeEps.size -> resumeEps[idx + 1].let { next ->
+                        PillButton("Siguiente: T${next.season} · E${next.number}", onClick = { playEpisode(resumeEps, idx + 1) }, icon = Icons.Rounded.PlayArrow, primary = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    nextSeasonEps.isNotEmpty() -> nextSeasonEps.first().let { next ->
+                        PillButton("Siguiente: T${next.season} · E${next.number}", onClick = { playEpisode(nextSeasonEps, 0) }, icon = Icons.Rounded.PlayArrow, primary = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    else -> PillButton("Volver a ver T${ep.season} · E${ep.number}", onClick = { playEpisode(resumeEps, idx) }, icon = Icons.Rounded.PlayArrow, primary = true, modifier = Modifier.fillMaxWidth())
+                }
             } else {
                 PillButton("Reproducir", onClick = { if (currentEps.isNotEmpty()) playEpisode(currentEps, 0) }, icon = Icons.Rounded.PlayArrow, primary = true, enabled = currentEps.isNotEmpty(), modifier = Modifier.fillMaxWidth())
             }
@@ -148,7 +171,7 @@ fun SeriesDetailScreen(nav: Navigator, insets: PaddingValues, seriesId: String) 
                 val eps = info?.seasons?.get(season).orEmpty()
                 // Dentro de una columna desplazable: los episodios van en una Column (una temporada son decenas, no miles).
                 eps.forEachIndexed { i, ep ->
-                    EpisodeRow(ep, playlist?.id ?: -1) { resumeMs -> playEpisode(eps, i, resumeMs) }
+                    EpisodeRow(ep, episodeHistory[ep.id]) { resumeMs -> playEpisode(eps, i, resumeMs) }
                 }
             }
         }
@@ -158,11 +181,8 @@ fun SeriesDetailScreen(nav: Navigator, insets: PaddingValues, seriesId: String) 
 }
 
 @Composable
-private fun EpisodeRow(ep: Episode, pid: Long, onPlay: (Long) -> Unit) {
-    val graph = LocalGraph.current
+private fun EpisodeRow(ep: Episode, history: HistoryEntity?, onPlay: (Long) -> Unit) {
     val c = Lumen.colors
-    var history by remember { mutableStateOf<HistoryEntity?>(null) }
-    LaunchedEffect(ep.id, pid) { history = graph.library.historyItem(pid, ContentKind.EPISODE, ep.id) }
     TapSurface(onClick = { onPlay(history?.positionMs?.takeIf { it > 30_000 } ?: 0) }, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(128.dp).aspectRatio(16f / 9f)) {

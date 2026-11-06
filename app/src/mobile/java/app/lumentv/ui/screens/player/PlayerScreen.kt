@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.provider.Settings
+import android.view.OrientationEventListener
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
@@ -18,6 +19,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -161,6 +168,9 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
     val c = Lumen.colors
 
     var item by remember { mutableStateOf(session.current) }
+    // Si Android cerró la app en segundo plano, al volver se restaura esta ruta sin cola: no hay nada
+    // que reproducir y se quedaba cargando para siempre.
+    LaunchedEffect(Unit) { if (item == null) nav.back() }
     var overlay by remember { mutableStateOf(true) }
     var overlayTick by remember { mutableIntStateOf(0) }
     var isPlaying by remember { mutableStateOf(false) }
@@ -175,6 +185,7 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
     var retries by remember { mutableIntStateOf(0) }
     var locked by remember { mutableStateOf(false) }
     var forcedLandscape by remember { mutableStateOf(false) }
+    var forcedPortrait by remember { mutableStateOf(false) }
 
     // El reproductor llega aparcado en el mini reproductor, traspasado desde la previsualización de
     // TV en directo o se crea nuevo. En los dos primeros casos ya tiene el stream abierto.
@@ -200,6 +211,8 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
         val pos = knownPosition
         val dur = knownDuration
         if (it.kind != ContentKind.LIVE && dur == 0L) return
+        // Un catch-up se apunta como el canal (con su nombre), no con el título del programa.
+        val catchupChannel = it.channel?.takeIf { _ -> it.kind == ContentKind.LIVE && it.subtitle.startsWith("Catch-up") }
         graph.appScope.launch {
             val p = known ?: graph.playlists.activeNow() ?: return@launch
             graph.library.record(
@@ -207,9 +220,9 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
                     playlistId = p.id,
                     kind = it.kind,
                     itemId = it.itemId,
-                    title = it.title,
-                    subtitle = it.subtitle,
-                    image = it.image,
+                    title = catchupChannel?.name ?: it.title,
+                    subtitle = if (catchupChannel != null) "" else it.subtitle,
+                    image = catchupChannel?.logo ?: it.image,
                     positionMs = if (it.kind == ContentKind.LIVE) 0 else pos,
                     durationMs = if (it.kind == ContentKind.LIVE) 0 else dur,
                     extra = it.extra,
@@ -308,6 +321,7 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
             override fun onTracksChanged(t: Tracks) { tracks = t }
         }
         player.addListener(listener)
+        activity?.pipPlayer = player
         activity?.playerActive = true
         buffering = player.playbackState != Player.STATE_READY
         isPlaying = player.isPlaying
@@ -316,6 +330,7 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
         onDispose {
             item?.let { saveHistory(it) }
             activity?.playerActive = false
+            activity?.let { if (it.pipPlayer === player) it.pipPlayer = null }
             player.removeListener(listener)
             if (!keepPlayer) player.release()
         }
@@ -382,12 +397,31 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
     fun toggleFullscreen() {
         val a = context as? Activity ?: return
         if (landscape) {
+            // Con el móvil en horizontal, dejar la orientación libre no hacía nada: se fuerza vertical
+            // y se libera cuando el móvil se pone de pie (`forcedPortrait`).
             forcedLandscape = false
-            a.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            forcedPortrait = true
+            a.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT
         } else {
+            forcedPortrait = false
             forcedLandscape = true
             a.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
+    }
+    DisposableEffect(forcedPortrait) {
+        val a = context as? Activity
+        if (!forcedPortrait || a == null) return@DisposableEffect onDispose {}
+        val listener = object : OrientationEventListener(context) {
+            override fun onOrientationChanged(degrees: Int) {
+                if (degrees == OrientationEventListener.ORIENTATION_UNKNOWN) return
+                if (degrees < 25 || degrees > 335) {
+                    a.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    forcedPortrait = false
+                }
+            }
+        }
+        if (listener.canDetectOrientation()) listener.enable() else forcedPortrait = false
+        onDispose { listener.disable() }
     }
     fun leave() {
         val current = item
@@ -583,12 +617,19 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
                     })
                 }
                 add(SheetOption("Abrir en otro reproductor", Icons.AutoMirrored.Rounded.OpenInNew) {
+                    // El reproductor de la app se cierra: si no, seguiría ocupando la conexión de la
+                    // cuenta y sonando por debajo. Sin «acción del usuario» para que no salte el PiP.
+                    saveHistory(current)
+                    activity?.playerActive = false
+                    player.stop()
                     runCatching {
                         context.startActivity(
                             android.content.Intent(android.content.Intent.ACTION_VIEW)
-                                .setDataAndType(android.net.Uri.parse(current.url), "video/*"),
+                                .setDataAndType(android.net.Uri.parse(current.url), "video/*")
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NO_USER_ACTION),
                         )
                     }
+                    nav.back()
                 })
             }
             if (activity?.supportsPip == true) add(SheetOption("Imagen en imagen (PiP)", Icons.Rounded.PictureInPicture) { activity.enterPip() })
@@ -748,8 +789,8 @@ private fun PortraitDetails(
         }
         if (isLive && programs.size > 1) {
             item { LText("A CONTINUACIÓN", style = Lumen.type.caption, color = c.textSecondary) }
-            programs.drop(1).forEach { prog ->
-                item(key = "p-${prog.startAt}") {
+            programs.drop(1).forEachIndexed { i, prog ->
+                item(key = "p-$i-${prog.startAt}") {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         LText(fmt.time(prog.startAt), style = Lumen.type.callout, color = c.textSecondary, modifier = Modifier.width(52.dp))
                         LText(prog.title, style = Lumen.type.callout, maxLines = 1)
@@ -813,23 +854,34 @@ private fun GestureBadge(icon: ImageVector, value: Int, modifier: Modifier) {
     }
 }
 
-/** Agotados los reintentos (Stitch L19-error-reproductor). */
+/**
+ * Agotados los reintentos (Stitch L19-error-reproductor). En vertical el vídeo mide unos 200 dp de
+ * alto: ahí el panel va sin icono, los botones bajan de línea si no caben y, si aun así no cabe, se desplaza.
+ */
+@kotlin.OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun BoxScope.ErrorPanel(message: String, onRetry: () -> Unit, onOther: (() -> Unit)?, onBack: () -> Unit) {
     val c = Lumen.colors
     Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.6f)))
-    Column(
-        Modifier.align(Alignment.Center).padding(16.dp).clip(RoundedCornerShape(20.dp)).background(c.surface.copy(alpha = 0.9f)).padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = c.warning, modifier = Modifier.size(40.dp))
-        LText("No se puede reproducir", style = Lumen.type.title, color = Color.White)
-        LText(message, style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PillButton("Reintentar", onClick = onRetry, primary = true)
-            onOther?.let { PillButton("Otro canal", onClick = it) }
-            PillButton("Volver", onClick = onBack)
+    BoxWithConstraints(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
+        val small = maxHeight < 320.dp
+        Column(
+            Modifier.padding(if (small) 8.dp else 16.dp).clip(RoundedCornerShape(20.dp)).background(c.surface.copy(alpha = 0.9f))
+                .verticalScroll(rememberScrollState()).padding(if (small) 12.dp else 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(if (small) 6.dp else 10.dp),
+        ) {
+            if (!small) Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = c.warning, modifier = Modifier.size(40.dp))
+            LText("No se puede reproducir", style = if (small) Lumen.type.headline else Lumen.type.title, color = Color.White)
+            LText(message, style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center, maxLines = if (small) 2 else 4)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PillButton("Reintentar", onClick = onRetry, primary = true)
+                onOther?.let { PillButton("Otro canal", onClick = it) }
+                PillButton("Volver", onClick = onBack)
+            }
         }
     }
 }
@@ -838,8 +890,16 @@ private fun initialBrightness(context: Context): Float {
     val window = (context as? Activity)?.window
     val current = window?.attributes?.screenBrightness ?: -1f
     if (current >= 0f) return current
-    return runCatching { Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS) / 255f }.getOrDefault(0.5f)
+    // El ajuste del sistema va de 0 a 255 en la mayoría, pero muchos móviles usan escalas mayores
+    // (1023, 2047, 4095…): dividir siempre entre 255 hacía que el primer gesto saltara al máximo.
+    return runCatching {
+        val raw = Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
+        val max = BRIGHTNESS_SCALES.firstOrNull { raw <= it } ?: raw
+        (raw.toFloat() / max).coerceIn(0.01f, 1f)
+    }.getOrDefault(0.5f)
 }
+
+private val BRIGHTNESS_SCALES = listOf(255, 1023, 2047, 4095, 8191, 16383, 65535)
 
 private data class TrackOption(val label: String, val override: TrackSelectionOverride, val selected: Boolean)
 
@@ -868,7 +928,9 @@ private fun humanError(e: PlaybackException): String = when (e.errorCode) {
     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Sin conexión con el servidor. Comprueba la red o la VPN."
     PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "Formato no soportado. Prueba otro formato en Ajustes o un reproductor externo."
-    else -> e.errorCodeName
+    PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> "Se perdió la señal del directo."
+    PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "El contenido ya no está disponible en el servidor."
+    else -> "Error de reproducción (código ${e.errorCode})."
 }
 
 @OptIn(UnstableApi::class)

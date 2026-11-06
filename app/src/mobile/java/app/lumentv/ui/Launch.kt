@@ -9,6 +9,7 @@ import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.HistoryEntity
 import app.lumentv.data.db.PlaylistEntity
+import app.lumentv.data.db.PlaylistType
 import app.lumentv.di.AppGraph
 import app.lumentv.player.PlayItem
 import app.lumentv.ui.navigation.Navigator
@@ -62,9 +63,28 @@ suspend fun AppGraph.resume(context: Context, nav: Navigator, p: PlaylistEntity,
             val m = catalog.movie(p.id, h.itemId) ?: return
             play(context, nav, listOf(streams.movie(p, m, h.extra.ifBlank { m.containerExt }, h.positionMs)), 0)
         }
+        // Como en la TV: reproduce el episodio con la ficha de la serie debajo (Atrás vuelve a ella).
         ContentKind.EPISODE -> {
             val seriesId = h.extra.substringBefore('|')
-            if (seriesId.isNotBlank()) nav.go(Routes.series(seriesId))
+            if (seriesId.isBlank()) return
+            val series = catalog.seriesById(p.id, seriesId)
+            // Los episodios se piden antes de navegar: al salir de Inicio se cancela este ámbito.
+            val info = if (p.type == PlaylistType.XTREAM) runCatching { xtream.seriesInfo(playlists.credentials(p), seriesId) }.getOrNull() else null
+            val eps = info?.seasons?.values?.firstOrNull { list -> list.any { it.id == h.itemId } }
+            nav.go(Routes.series(seriesId))
+            // Sin episodios (lista M3U o fallo de red) se queda en la ficha de la serie.
+            if (info == null || eps == null) return
+            var index = eps.indexOfFirst { it.id == h.itemId }
+            var startMs = h.positionMs
+            // Visto hasta el final: el siguiente de la temporada, desde el principio.
+            if (h.durationMs > 0 && h.positionMs >= h.durationMs * 95 / 100 && index + 1 < eps.size) {
+                index++
+                startMs = 0
+            }
+            val name = series?.name ?: info.name
+            val cover = series?.cover ?: info.cover
+            val items = eps.mapIndexed { i, ep -> streams.episode(p, seriesId, name, cover, ep, if (i == index) startMs else 0) }
+            play(context, nav, items, index)
         }
         ContentKind.SERIES -> nav.go(Routes.series(h.itemId))
     }

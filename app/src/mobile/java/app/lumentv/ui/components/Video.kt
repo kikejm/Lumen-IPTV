@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -27,6 +32,15 @@ import app.lumentv.ui.theme.Lumen
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoSurface(player: Player?, modifier: Modifier = Modifier, resizeMode: ResizeMode = ResizeMode.FIT) {
+    // La pantalla no se apaga mientras el vídeo suena o carga; en pausa, parado o con error, sí.
+    var awake by remember(player) { mutableStateOf(player?.keepsScreenOn() == true) }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onEvents(p: Player, events: Player.Events) { awake = p.keepsScreenOn() }
+        }
+        player?.addListener(listener)
+        onDispose { player?.removeListener(listener) }
+    }
     AndroidView(
         factory = { ctx ->
             PlayerView(ctx).apply {
@@ -35,11 +49,11 @@ fun VideoSurface(player: Player?, modifier: Modifier = Modifier, resizeMode: Res
                 setKeepContentOnPlayerReset(true)
                 // Al parar o reconectar se queda congelada la última imagen en vez de un fundido a negro.
                 setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-                keepScreenOn = true
             }
         },
         update = { view ->
             view.player = player
+            view.keepScreenOn = awake
             view.resizeMode = when (resizeMode) {
                 ResizeMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                 ResizeMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -50,6 +64,9 @@ fun VideoSurface(player: Player?, modifier: Modifier = Modifier, resizeMode: Res
         modifier = modifier,
     )
 }
+
+private fun Player.keepsScreenOn(): Boolean =
+    playWhenReady && (playbackState == Player.STATE_READY || playbackState == Player.STATE_BUFFERING)
 
 /** Anillo blanco que gira, sobre vídeo (DESIGN.md: pista al 20 %). */
 @Composable

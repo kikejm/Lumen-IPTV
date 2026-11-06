@@ -251,7 +251,8 @@ private fun PlaylistsSection(nav: Navigator, toast: (String) -> Unit) {
             "Eliminar «${p.name}»",
             "Se borrarán sus canales, favoritos e historial de este móvil.",
             "Eliminar",
-            onConfirm = { scope.launch { graph.playlists.delete(p.id) } },
+            // En el ámbito de la app: si no, salir de Ajustes a medio borrar dejaba la lista a medias.
+            onConfirm = { graph.appScope.launch { graph.playlists.delete(p.id) } },
             onDismiss = { deleteFor = null },
             destructive = true,
         )

@@ -43,9 +43,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.lumentv.core.net.isMeteredNetwork
 import app.lumentv.tools.SpeedResult
 import app.lumentv.ui.components.LText
 import app.lumentv.ui.components.PillButton
@@ -55,9 +57,9 @@ import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import app.lumentv.vpn.VpnState
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 /** Ruta propia del móvil (en la TV el test vive dentro de Ajustes). */
 const val SPEED_TEST_ROUTE = "speedtest"
@@ -102,8 +104,11 @@ fun SpeedTestScreen(nav: Navigator, insets: PaddingValues) {
             delay(100)
         }
     }
-    // Se lanza solo al entrar: es lo que se viene a hacer aquí.
-    LaunchedEffect(Unit) { start() }
+    // Se lanza solo al entrar (es lo que se viene a hacer aquí), salvo con datos móviles: cada test
+    // descarga decenas de MB y ahí se espera a que el usuario lo pida.
+    val context = LocalContext.current
+    val metered = remember { context.isMeteredNetwork() }
+    LaunchedEffect(Unit) { if (!metered) start() }
 
     val mbps = if (running) live else result?.downloadMbps ?: 0.0
     val arc by animateFloatAsState(
@@ -139,6 +144,7 @@ fun SpeedTestScreen(nav: Navigator, insets: PaddingValues) {
                                 running -> "Midiendo…"
                                 error != null -> "No se pudo medir"
                                 result != null -> "Completado"
+                                metered -> "Con datos móviles puede gastar hasta 100 MB"
                                 else -> ""
                             },
                             style = Lumen.type.callout,

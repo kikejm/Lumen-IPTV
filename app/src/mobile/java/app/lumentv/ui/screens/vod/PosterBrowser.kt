@@ -1,6 +1,7 @@
 package app.lumentv.ui.screens.vod
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,16 +21,23 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,7 +96,15 @@ fun PosterBrowser(
     val c = Lumen.colors
     val compact = LocalWidthClass.current == WidthClass.Compact
     val gridState = rememberLazyGridState()
-    LaunchedEffect(selectedCategory) { gridState.scrollToItem(0) }
+    // Arriba solo al cambiar de categoría: al volver de una ficha o del reproductor la rejilla se
+    // queda donde estaba.
+    var lastCategory by rememberSaveable { mutableStateOf(selectedCategory) }
+    LaunchedEffect(selectedCategory) {
+        if (selectedCategory != lastCategory) {
+            lastCategory = selectedCategory
+            gridState.scrollToItem(0)
+        }
+    }
     val hero = items.firstOrNull()
 
     Column(Modifier.fillMaxSize().padding(insets)) {
@@ -116,7 +132,7 @@ fun PosterBrowser(
                             onLongClick = { onCategoryMenu(cat) },
                             radius = 50.dp,
                             color = if (on) c.accent else c.surface,
-                            modifier = Modifier.heightIn(min = 40.dp),
+                            modifier = Modifier.minimumInteractiveComponentSize().heightIn(min = 40.dp),
                         ) {
                             Row(Modifier.align(Alignment.Center).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 if (cat.locked) Icon(Icons.Rounded.Lock, contentDescription = "Bloqueada", tint = if (on) c.onAccent else c.textSecondary, modifier = Modifier.size(14.dp))
@@ -141,6 +157,16 @@ fun PosterBrowser(
                     ) {
                         Artwork(item.image, item.title, Modifier.fillMaxSize(), radius = LumenDimens.radiusMedium, contentScale = ContentScale.Crop)
                         if (item.id in favorites) Chip("Mi lista", c.accent, filled = true, modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
+                        // «⋯» visible con las mismas opciones que la pulsación larga (DESIGN-MOBILE.md).
+                        Box(
+                            Modifier.align(Alignment.TopEnd).minimumInteractiveComponentSize()
+                                .clickable(onClickLabel = "Opciones de ${item.title}") { onItemMenu(item) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(Modifier.size(28.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = "Opciones de ${item.title}", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
                     }
                     LText(item.title, style = Lumen.type.callout, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
                     if (item.rating.isNotBlank() && item.rating != "0") LText("★ ${item.rating}", style = Lumen.type.caption, color = c.textTertiary, maxLines = 1)

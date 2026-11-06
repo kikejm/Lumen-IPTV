@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -210,9 +211,10 @@ private fun TileGrid(tiles: List<Tile>, perRow: Int, onClick: (Tile) -> Unit) {
         tiles.chunked(perRow).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { t ->
-                    TapSurface(onClick = { onClick(t) }, modifier = Modifier.weight(1f).height(76.dp), radius = LumenDimens.radiusMedium) {
+                    TapSurface(onClick = { onClick(t) }, modifier = Modifier.weight(1f).heightIn(min = 76.dp), radius = LumenDimens.radiusMedium) {
+                        // Alto mínimo, no fijo: con letra grande del sistema la fila crece en vez de cortar.
                         Row(
-                            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                            Modifier.fillMaxWidth().heightIn(min = 76.dp).padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {

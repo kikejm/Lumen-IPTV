@@ -82,6 +82,10 @@ Alan Sans empaquetada (`res/font`): 800 para títulos, 400 para el resto. Sobre 
 | Ajustes | Lista de secciones → detalle | Maestro-detalle | Maestro-detalle |
 | Opciones (☰ en TV) | Hoja inferior | Hoja lateral derecha (360 dp) | Hoja lateral |
 
+- **TV en directo**: al entrar, la previsualización arranca sola con el primer canal salvo que haya algo en el mini reproductor (la cuenta solo admite una conexión) o se esté con datos móviles; entonces muestra «Toca un canal para verlo aquí». Tocar otro canal lo pasa a la previsualización; tocar el que ya suena (o la previsualización) lo abre a pantalla completa sin recargar. Reconecta como la multipantalla (`StreamReconnect`); agotados los intentos, «No disponible · Toca para reintentar».
+- **Pestañas**: cada destino principal guarda su pila y su estado (categoría, desplazamiento) al cambiar de pestaña. Volver de una ficha o del reproductor deja las listas donde estaban.
+- **Barra superior en vertical**: título a 22 sp (`title`) y píldora VPN sin el nombre del servidor, para que el título no se corte.
+
 Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale solo (3 en vertical, 6 en horizontal, 8–10 en tableta).
 
 ### Gestos e interacción
@@ -89,7 +93,8 @@ Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale 
 - **Toque** = OK de la TV. **Pulsación larga** = ☰ de la TV, y **siempre** hay también un botón «⋯» visible con las mismas opciones.
 - Reproductor: toque muestra/oculta controles; deslizar vertical a la izquierda = brillo, a la derecha = volumen; doble toque a los lados = ±10 s (VOD); deslizar horizontal en directo = canal anterior/siguiente; candado para bloquear toques.
 - **Girar el móvil** en el reproductor entra o sale de pantalla completa **sin cortar el vídeo**. El botón de pantalla completa fuerza horizontal y lo libera al salir.
-- Al salir del reproductor con algo sonando: **mini reproductor** de 64 dp sobre la barra inferior (vídeo, canal, pausa, cerrar). Al salir de la app: PiP automático (Android 12+) si está activo en Ajustes; si no hay PiP, todo se pausa y se reanuda al volver. Cerrar la ventana PiP deja el vídeo en pausa.
+- Al salir del reproductor con algo sonando: **mini reproductor** de 64 dp sobre la barra inferior (vídeo, canal, pausa, cerrar). Al salir de la app: PiP automático (Android 12+) si está activo en Ajustes; si no hay PiP, todo se pausa y se reanuda al volver. Cerrar la ventana PiP deja el vídeo en pausa. La ventana PiP toma la proporción del vídeo y lleva un botón de pausa/reproducir. Al cerrar el mini reproductor (o si otro vídeo ocupa la conexión) se guarda el minuto de la película o el episodio.
+- Botón de pantalla completa: fuerza horizontal; el de salir fuerza vertical y libera la orientación cuando el móvil se pone de pie.
 - Foco de audio: el vídeo se pausa con una llamada y no suena encima de otras apps.
 - Reconexión del reproductor igual que en TV: 5 intentos cada 3 s, última imagen congelada y píldora «Error de reproducción, vuelve a conectar en 3 s (1/5)»; agotados, panel con «Reintentar» / «Otro canal» / «Volver».
 - Multipantalla: 2 vídeos en móvil (apilados en vertical, lado a lado en horizontal) y 4 en tableta. Tocar un vídeo le da el audio (anillo blanco); pulsación larga o «⋯» = cambiar canal, ampliar, quitar. Reconexión como en la TV (`StreamReconnect`).
@@ -110,17 +115,17 @@ Viven en `app/src/mobile/java/app/lumentv/ui/components/`. Pueden usar Material 
 
 - `TapSurface` — base de todo lo pulsable (equivalente táctil de `FocusSurface`): forma, color en reposo/pulsado, *ripple*, `onClick` y `onLongClick` opcionales.
 - `PillButton` — primario (blanco, texto negro) y secundario (`surface-elevated`).
-- `Chip` / `QualityPill` — filtros horizontales desplazables; el activo en acento.
+- `FilterChip` — filtros horizontales desplazables (categorías, calidad, temporadas); el activo en acento. 40 dp a la vista y 48 dp de zona táctil. `Chip` es la etiqueta no pulsable.
 - `VpnPill` — punto de estado + texto; abre la pantalla VPN.
 - `Artwork` — logo/póster con iniciales solo si no hay imagen.
 - `ProgressLine` — 3 dp, acento.
 - `OptionsSheet` — opciones contextuales: hoja inferior en *Compact*, lateral en *Medium/Expanded*.
 - `PinSheet` — PIN parental con teclado numérico propio (no el del sistema).
-- `ConfirmDialog`, `EmptyState` (icono, título, texto, acción), `ErrorState` (icono naranja, mensaje en español, «Reintentar» + acciones alternativas).
+- `ConfirmDialog` y `EmptyState` (icono, título, texto, acción). El error del reproductor es su `ErrorPanel` (icono naranja, mensaje en español, «Reintentar» + acciones alternativas; en vertical, compacto y desplazable).
 - `GroupCard` + `SettingRow` / `SwitchRow` (`LumenSwitch`) — listas agrupadas de Ajustes, separadas por `RowDivider`. Valores de una lista corta se eligen en una hoja con opciones de radio, no pasando valores como en la TV.
 - `TextInputSheet` (un campo + «Guardar»), `NoticePill` (aviso de 4 s abajo al centro) y `ReconnectPill` (sobre vídeos pequeños).
-- `MiniPlayer`, `PlayerControls` (gestos), `VideoSurface` (fuera de cualquier superficie con capa propia, igual que en TV).
-- `AdaptivePanes` — una columna / dos o tres paneles según `WindowSizeClass`.
+- `MiniPlayer` (`ui/player`), los controles y gestos del reproductor (dentro de `PlayerScreen`) y `VideoSurface` (fuera de cualquier superficie con capa propia, igual que en TV; la pantalla solo se mantiene encendida mientras el vídeo suena o carga).
+- Una columna / dos o tres paneles según `LocalWidthClass` (`ui/adaptive`): cada pantalla monta los suyos con `when (widthClass)`.
 
 ## Do's and Don'ts
 
