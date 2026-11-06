@@ -1,7 +1,11 @@
 name: Release
 
-# Se lanza al hacer push de un tag vX.Y.Z. Compila el APK firmado y publica una
-# GitHub Release con el APK y `update.json` (lo que lee el actualizador de la app).
+# Se lanza al hacer push de un tag vX.Y.Z. Compila y firma los APK de la TV y del móvil y publica
+# una GitHub Release con los dos y sus manifiestos (lo que lee el actualizador de cada app):
+#   lumen-X.Y.Z.apk        + update.json         → Fire TV (app.lumentv)
+#   lumen-mobile-X.Y.Z.apk + update-mobile.json  → móvil (app.lumentv.mobile)
+# Lanzado a mano (Actions → Release → Run workflow) solo compila y firma: deja los dos APK como
+# artefacto del run y no publica nada, para probarlos antes de sacar la versión.
 on:
   push:
     tags: ["v*"]
@@ -33,7 +37,11 @@ jobs:
           fi
           mkdir -p keystore
           echo "$LUMEN_KEYSTORE_BASE64" | base64 --decode > keystore/lumen-release.jks
-          VERSION_NAME="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            VERSION_NAME="${GITHUB_REF_NAME#v}"
+          else
+            VERSION_NAME=$(grep '^lumen.versionName=' gradle.properties | cut -d= -f2)
+          fi
           VERSION_CODE=$(grep '^lumen.versionCode=' gradle.properties | cut -d= -f2)
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
@@ -43,35 +51,59 @@ jobs:
             echo "LUMEN_UPDATE_GITHUB_REPO=${{ github.repository }}"
           } > .env
 
-      - name: Tests y build release
+      - name: Tests y build release (tv y mobile)
         env:
           LUMEN_KEYSTORE_PASSWORD: ${{ secrets.LUMEN_KEYSTORE_PASSWORD }}
           LUMEN_KEY_ALIAS: ${{ secrets.LUMEN_KEY_ALIAS }}
           LUMEN_KEY_PASSWORD: ${{ secrets.LUMEN_KEY_PASSWORD }}
           LUMEN_UPDATE_GITHUB_TOKEN: ${{ secrets.LUMEN_UPDATE_GITHUB_TOKEN }}
-        run: ./gradlew --no-daemon testTvDebugUnitTest assembleTvRelease
+        run: ./gradlew --no-daemon testTvDebugUnitTest testMobileDebugUnitTest assembleTvRelease assembleMobileRelease
 
       - name: Empaquetar artefactos
         run: |
           mkdir -p release
-          APK="release/lumen-${VERSION_NAME}.apk"
-          cp app/build/outputs/apk/tv/release/app-tv-release.apk "$APK"
-          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          TV_APK="lumen-${VERSION_NAME}.apk"
+          MOBILE_APK="lumen-mobile-${VERSION_NAME}.apk"
+          cp app/build/outputs/apk/tv/release/app-tv-release.apk "release/$TV_APK"
+          cp app/build/outputs/apk/mobile/release/app-mobile-release.apk "release/$MOBILE_APK"
+          echo "TV_APK=$TV_APK" >> "$GITHUB_ENV"
+          echo "MOBILE_APK=$MOBILE_APK" >> "$GITHUB_ENV"
           NOTES=$(git log -1 --pretty=%B | head -c 2000)
-          jq -n \
-            --argjson versionCode "$VERSION_CODE" \
-            --arg versionName "$VERSION_NAME" \
-            --arg sha256 "$SHA" \
-            --arg notes "$NOTES" \
-            --arg apkUrl "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/lumen-${VERSION_NAME}.apk" \
-            '{versionCode: $versionCode, versionName: $versionName, sha256: $sha256, notes: $notes, apkUrl: $apkUrl}' \
-            > release/update.json
-          cat release/update.json
+          # $1 = APK, $2 = manifiesto. La TV y el móvil comparten versión (gradle.properties).
+          manifest() {
+            SHA=$(sha256sum "release/$1" | cut -d' ' -f1)
+            jq -n \
+              --argjson versionCode "$VERSION_CODE" \
+              --arg versionName "$VERSION_NAME" \
+              --arg sha256 "$SHA" \
+              --arg notes "$NOTES" \
+              --arg apkUrl "https://github.com/${{ github.repository }}/releases/download/${GITHUB_REF_NAME}/$1" \
+              '{versionCode: $versionCode, versionName: $versionName, sha256: $sha256, notes: $notes, apkUrl: $apkUrl}' \
+              > "release/$2"
+            cat "release/$2"
+          }
+          manifest "$TV_APK" update.json
+          manifest "$MOBILE_APK" update-mobile.json
 
+      - name: Guardar APK firmados (sin publicar)
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: apks-release-${{ env.VERSION_NAME }}
+          path: release/*.apk
+          retention-days: 14
+
+      # Las TV con la 1.0.10 o anterior se bajan el primer .apk de la Release, así que el de la TV se
+      # sube antes que el del móvil. Se crea como borrador y se publica al final: nadie (ni la TV ni
+      # el móvil) llega a ver una Release a medias.
       - name: Publicar GitHub Release
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release/* \
+          gh release create "$GITHUB_REF_NAME" "release/$TV_APK" release/update.json \
+            --draft \
             --title "Lumen ${VERSION_NAME}" \
             --generate-notes
+          gh release upload "$GITHUB_REF_NAME" "release/$MOBILE_APK" release/update-mobile.json
+          gh release edit "$GITHUB_REF_NAME" --draft=false

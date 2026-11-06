@@ -191,6 +191,8 @@ Pendiente de probar en un móvil real (el contenedor de desarrollo no tiene SDK 
 
 ### Fase 6 — Publicación (1 día)
 
+**Preparada (6 nov 2026), sin publicar todavía.** `release.yml` compila y firma los dos sabores y publica una sola Release con `lumen-X.Y.Z.apk` + `update.json` (TV) y `lumen-mobile-X.Y.Z.apk` + `update-mobile.json` (móvil). El nombre `update.json` no cambia y el APK de la TV se sube primero, como borrador que se publica al final, porque las TV con la 1.0.10 o anterior buscan `update.json` y se bajan el primer `.apk`. `UpdateManager` elige el manifiesto con `BuildConfig.FLAVOR` y baja el APK que nombra (`ReleaseAssets`). Lanzado a mano, el workflow solo deja los APK firmados como artefacto. Icono adaptativo en `src/mobile/res/mipmap-anydpi-v26` con el logo cuadrado de la TV 1.0.10 como capa de fondo (sin monocromo: se ve igual que en el Fire TV). El móvil, como la TV, avisa en Inicio de que hay versión nueva. La primera Release con móvil también actualiza el Fire TV: se publica cuando el APK debug del móvil esté probado en un teléfono.
+
 - `release.yml`: compilar `assembleTvRelease assembleMobileRelease` y publicar dos APK con su `update.json` (`update.json` para TV, `update-mobile.json` para móvil). `UpdateManager` elige el manifiesto según el sabor (`BuildConfig.FLAVOR`).
 - Icono adaptativo en `src/mobile/res/mipmap-*` (la restricción de `drawable` es solo del lanzador de Fire OS).
 - Instalación en el móvil: descargar el APK de la Release y permitir «Instalar apps desconocidas».

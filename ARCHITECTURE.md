@@ -48,7 +48,7 @@ Los paquetes Kotlin son los mismos en los tres; lo de abajo cuelga de `app/src/<
 - `player/` — `PlayerFactory` (ExoPlayer configurado según Ajustes: búfer, User-Agent, decoder fallback), `StreamResolver` (entidad → `PlayItem` con URL) y `PlaybackSession` (cola compartida para zapping y auto-siguiente episodio).
 - `vpn/` — `ProtonConfigParser` (valida `.conf`, deduce servidor/país, aplica ámbito), `VpnServerRepository` (catálogo cifrado, importación desde assets/URL/móvil) y `VpnManager` (estado, conexión, estadísticas, IP pública).
 - `remote/ImportServer` — servidor HTTP mínimo en la LAN con página web para subir `.conf` y dar de alta listas desde el móvil.
-- `update/UpdateManager` — OTA: GitHub Releases o manifiesto JSON, descarga con verificación SHA-256 e instalación vía `FileProvider`.
+- `update/UpdateManager` — OTA: GitHub Releases o manifiesto JSON, descarga con verificación SHA-256 e instalación vía `FileProvider`. La TV lee `update.json` y el móvil `update-mobile.json` de la misma Release (`ReleaseAssets`, según `BuildConfig.FLAVOR`); cada uno baja el APK que nombra su manifiesto.
 - `tools/SpeedTest` — test de descarga y latencia.
 - `ui/` — `theme/Theme.kt` y `navigation/` compartidos; el resto es del sabor. En `tv`: Compose for TV, `theme/` (tokens), `components/` (piezas reutilizables, todas enfocables), `navigation/` (rutas, `Navigator`, `LocalGraph`), `LumenRoot` (NavHost), `Launch.kt` (arrancar reproducción, reanudar historial, tecla ☰) y `screens/<pantalla>/`.
 
@@ -56,7 +56,7 @@ Fuera del código:
 
 - `gradle/libs.versions.toml` — catálogo de versiones.
 - `app/build.gradle.kts` — lee `.env` y lo expone como `BuildConfig`; copia `vpn-configs/*.conf` a assets si se pide.
-- `.github/workflows/release.yml` — build firmado + GitHub Release con `update.json`.
+- `.github/workflows/release.yml` — build firmado de los dos sabores + una GitHub Release con los dos APK y sus manifiestos (`update.json`, `update-mobile.json`). Lanzado a mano, solo deja los APK firmados como artefacto.
 - `design/stitch/` — capturas de los diseños de Stitch; `design/screenshots/` — capturas de la app real en el emulador.
 - `tools/mock-xtream/` — panel Xtream falso (Python) para probar sin una lista real.
 
