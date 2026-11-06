@@ -34,6 +34,10 @@ data class AppSettings(
     val autoRefreshHours: Int = 24,
     /** Imagen en imagen al salir de la app con vídeo. Solo móvil: la TV no tiene PiP. */
     val pipEnabled: Boolean = true,
+    /** Solo móvil: con datos móviles no se actualizan solos el catálogo ni la guía, salvo que se permita. */
+    val syncOnMobileData: Boolean = false,
+    /** Solo móvil: aviso al empezar a reproducir con datos móviles (una vez por sesión). */
+    val mobileDataWarning: Boolean = true,
     val vpnAutoConnect: Boolean = false,
     val vpnDisconnectOnExit: Boolean = true,
     val vpnAppOnly: Boolean = true,
@@ -82,6 +86,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
     suspend fun setExternalPlayer(pkg: String) = update { it[K.externalPlayer] = pkg }
     suspend fun setAutoRefreshHours(v: Int) = update { it[K.autoRefresh] = v }
     suspend fun setPipEnabled(v: Boolean) = update { it[K.pip] = v }
+    suspend fun setSyncOnMobileData(v: Boolean) = update { it[K.syncOnMobileData] = v }
+    suspend fun setMobileDataWarning(v: Boolean) = update { it[K.mobileDataWarning] = v }
     suspend fun setVpnAutoConnect(v: Boolean) = update { it[K.vpnAuto] = v }
     suspend fun setVpnDisconnectOnExit(v: Boolean) = update { it[K.vpnDisconnectOnExit] = v }
     suspend fun setVpnAppOnly(v: Boolean) = update { it[K.vpnAppOnly] = v }
@@ -104,6 +110,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         externalPlayerPackage = this[K.externalPlayer] ?: "",
         autoRefreshHours = this[K.autoRefresh] ?: 24,
         pipEnabled = this[K.pip] ?: true,
+        syncOnMobileData = this[K.syncOnMobileData] ?: false,
+        mobileDataWarning = this[K.mobileDataWarning] ?: true,
         vpnAutoConnect = this[K.vpnAuto] ?: false,
         vpnDisconnectOnExit = this[K.vpnDisconnectOnExit] ?: true,
         vpnAppOnly = this[K.vpnAppOnly] ?: true,
@@ -130,6 +138,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val externalPlayer = stringPreferencesKey("external_player")
         val autoRefresh = intPreferencesKey("auto_refresh_hours")
         val pip = booleanPreferencesKey("pip")
+        val syncOnMobileData = booleanPreferencesKey("sync_on_mobile_data")
+        val mobileDataWarning = booleanPreferencesKey("mobile_data_warning")
         val vpnAuto = booleanPreferencesKey("vpn_auto_connect")
         val vpnDisconnectOnExit = booleanPreferencesKey("vpn_disconnect_on_exit")
         val vpnAppOnly = booleanPreferencesKey("vpn_app_only")

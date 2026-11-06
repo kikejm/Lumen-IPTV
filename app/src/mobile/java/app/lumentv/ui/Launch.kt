@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import app.lumentv.core.net.isMeteredNetwork
 import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.HistoryEntity
@@ -31,8 +32,19 @@ fun AppGraph.play(context: Context, nav: Navigator, items: List<PlayItem>, index
         if (runCatching { context.startActivity(intent) }.isSuccess) return
         Toast.makeText(context, "Reproductor externo no disponible, usando el interno", Toast.LENGTH_SHORT).show()
     }
+    warnMobileData(context)
     playback.start(items, index)
     nav.go(Routes.PLAYER)
+}
+
+/** Ya se avisó en esta sesión de que se reproduce con datos móviles. */
+private var mobileDataWarned = false
+
+/** Una vez por sesión, al reproducir con datos móviles: cuánto gasta el vídeo (se puede desactivar en Ajustes). */
+private fun AppGraph.warnMobileData(context: Context) {
+    if (mobileDataWarned || !settings.current.mobileDataWarning || !context.isMeteredNetwork()) return
+    mobileDataWarned = true
+    Toast.makeText(context, "Usas datos móviles: una hora de vídeo en HD gasta entre 1,5 y 3 GB", Toast.LENGTH_LONG).show()
 }
 
 fun AppGraph.playChannels(context: Context, nav: Navigator, p: PlaylistEntity, channels: List<ChannelEntity>, index: Int) =

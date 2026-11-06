@@ -2,7 +2,9 @@ package app.lumentv.di
 
 import android.app.Application
 import android.util.Log
+import app.lumentv.BuildConfig
 import app.lumentv.core.crypto.SecretBox
+import app.lumentv.core.net.isMeteredNetwork
 import app.lumentv.core.util.countryName
 import app.lumentv.data.catalog.CatalogRepository
 import app.lumentv.data.db.LumenDatabase
@@ -138,7 +140,10 @@ class AppGraph(val app: Application) {
             val upgraded = runCatching { playlists.upgradeXtreamM3uLists() }
                 .onFailure { Log.w(TAG, "Convertir listas M3U de Xtream", it) }
                 .getOrDefault(emptyList())
-            playlists.activeNow()?.let { p ->
+            // En el móvil, con datos móviles no se descargan solos catálogo y guía (pueden ser cientos de MB).
+            val onMobileData = BuildConfig.FLAVOR == "mobile" && !s.syncOnMobileData && app.isMeteredNetwork()
+            if (onMobileData) Log.i(TAG, "Datos móviles: sin actualización automática del catálogo")
+            playlists.activeNow()?.takeIf { !onMobileData }?.let { p ->
                 if (p.id in upgraded || catalog.needsSync(p, s.autoRefreshHours)) syncPlaylist(p.id)
                 else if (epg.needsSync(p)) runCatching { epg.sync(p) }
             }

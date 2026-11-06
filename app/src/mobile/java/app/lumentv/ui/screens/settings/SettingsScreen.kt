@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.SignalCellularAlt
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Icon
@@ -91,6 +92,7 @@ private enum class Section(val label: String, val icon: ImageVector) {
     PLAYER("Reproductor", Icons.Rounded.PlayCircle),
     EPG("Guía EPG", Icons.Rounded.Schedule),
     VPN("VPN", Icons.Rounded.Shield),
+    DATA("Datos móviles", Icons.Rounded.SignalCellularAlt),
     PARENTAL("Control parental", Icons.Rounded.Lock),
     TOOLS("Herramientas", Icons.Rounded.Handyman),
     ABOUT("Acerca de", Icons.Rounded.Info),
@@ -170,6 +172,7 @@ private fun SectionContent(section: Section, nav: Navigator, toast: (String) -> 
         Section.PLAYER -> PlayerSection()
         Section.EPG -> EpgSection(toast)
         Section.VPN -> VpnSection(nav)
+        Section.DATA -> DataSection()
         Section.PARENTAL -> ParentalSection(toast)
         Section.TOOLS -> ToolsSection(nav)
         Section.ABOUT -> AboutSection()
@@ -409,6 +412,26 @@ private fun VpnSection(nav: Navigator) {
         s.vpnAppOnly,
         { v -> graph.appScope.launch { graph.settings.setVpnAppOnly(v); graph.vpn.reapplyScope() } },
         subtitle = "Si se desactiva, todo el tráfico del móvil pasa por la VPN",
+    )
+}
+
+@Composable
+private fun DataSection() {
+    val graph = LocalGraph.current
+    val scope = rememberCoroutineScope()
+    val s = rememberSettings()
+    SwitchRow(
+        "Avisar al reproducir con datos",
+        s.mobileDataWarning,
+        { v -> scope.launch { graph.settings.setMobileDataWarning(v) } },
+        subtitle = "Un aviso por sesión con lo que gasta el vídeo",
+    )
+    RowDivider()
+    SwitchRow(
+        "Actualizar listas con datos",
+        s.syncOnMobileData,
+        { v -> scope.launch { graph.settings.setSyncOnMobileData(v) } },
+        subtitle = "Si está desactivado, canales y guía solo se actualizan solos con wifi. «Actualizar ahora» funciona siempre.",
     )
 }
 
