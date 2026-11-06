@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -164,7 +165,8 @@ fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit, modifier: M
     val c = Lumen.colors
     TapSurface(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 40.dp),
+        // 40 dp a la vista, pero 48 dp de zona táctil (DESIGN-MOBILE.md).
+        modifier = modifier.minimumInteractiveComponentSize().defaultMinSize(minHeight = 40.dp),
         radius = 50.dp,
         color = if (selected) c.accent else c.surface,
     ) {
@@ -268,3 +270,9 @@ fun EmptyState(
 fun Gap(width: Dp = 0.dp, height: Dp = 0.dp) {
     Spacer(Modifier.width(width).height(height))
 }
+
+/**
+ * Espera antes de que una fila (lista de canales, Guía) pida su EPG: al desplazar deprisa, las filas
+ * que pasan de largo salen de la composición antes y no llegan a pedir nada.
+ */
+const val EPG_ROW_DELAY_MS = 300L

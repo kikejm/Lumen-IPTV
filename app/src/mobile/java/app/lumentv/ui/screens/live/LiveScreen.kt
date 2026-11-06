@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,8 +53,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import app.lumentv.core.net.isMeteredNetwork
 import app.lumentv.core.util.TimeFormatter
 import app.lumentv.data.catalog.QualityFilter
 import app.lumentv.data.db.ChannelEntity
@@ -64,6 +66,7 @@ import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.catchupRoute
 import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.components.Artwork
+import app.lumentv.ui.components.EPG_ROW_DELAY_MS
 import app.lumentv.ui.components.EmptyState
 import app.lumentv.ui.components.FilterChip
 import app.lumentv.ui.components.Gap
@@ -73,14 +76,17 @@ import app.lumentv.ui.components.LoadingSpinner
 import app.lumentv.ui.components.OptionsSheet
 import app.lumentv.ui.components.PinSheet
 import app.lumentv.ui.components.ProgressLine
+import app.lumentv.ui.components.ReconnectPill
 import app.lumentv.ui.components.SheetOption
 import app.lumentv.ui.components.TapSurface
 import app.lumentv.ui.components.TopBar
 import app.lumentv.ui.components.VideoSurface
+import app.lumentv.ui.components.rememberStreamReconnect
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.playChannels
+import app.lumentv.ui.player.LocalMiniPlayer
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import kotlinx.coroutines.delay
@@ -102,6 +108,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     val scope = rememberCoroutineScope()
     val widthClass = LocalWidthClass.current
     val vm: LiveViewModel = viewModel { LiveViewModel(graph) }
+    val mini = LocalMiniPlayer.current
     // Al volver de pantalla completa llega su reproductor con el canal que sonaba (quizá tras hacer
     // zapping): se previsualiza ese canal ya, antes de leer el estado, para no recargarlo. Si la lista
     // a la vista no lo contiene, se abre su categoría.
@@ -130,19 +137,13 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     val player = remember { returned ?: graph.players.create() }
     var handedOff by remember { mutableStateOf(false) }
     var previewState by remember { mutableIntStateOf(player.playbackState) }
-    var previewFailed by remember { mutableStateOf(false) }
-    var previewRetry by remember { mutableIntStateOf(0) }
-    var previewReconnect by remember { mutableIntStateOf(0) }
+    // ¿Puede sonar ya? Al entrar se previsualiza sola salvo que haya algo en el mini reproductor (la
+    // cuenta solo admite una conexión y se cortaría) o se esté con datos móviles. Tocar un canal o la
+    // previsualización la activa.
+    var armed by remember { mutableStateOf(returned != null || (mini.player == null && !context.isMeteredNetwork())) }
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
-            override fun onPlaybackStateChanged(state: Int) {
-                previewState = state
-                // Un directo que termina es un corte de emisión: se vuelve a conectar.
-                if (state == Player.STATE_ENDED) previewReconnect++
-            }
-            override fun onPlayerError(error: PlaybackException) {
-                if (previewRetry < 1) previewRetry++ else previewFailed = true
-            }
+            override fun onPlaybackStateChanged(state: Int) { previewState = state }
         }
         player.addListener(listener)
         onDispose {
@@ -150,27 +151,33 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
             if (!handedOff) player.release()
         }
     }
-    LaunchedEffect(preview) { previewRetry = 0 }
-    LaunchedEffect(preview, playlist, previewRetry, previewReconnect) {
+    // Reconexión igual que la TV y la multipantalla: 5 intentos, uno cada 3 s (también tras 20 s cargando).
+    val reconnect = rememberStreamReconnect(player, isActive = { armed && !handedOff }) {
+        graph.players.claimStream(player)
+        player.seekToDefaultPosition()
+        player.prepare()
+        player.playWhenReady = true
+    }
+    LaunchedEffect(preview, playlist, armed) {
         val p = playlist ?: return@LaunchedEffect
         val ch = preview ?: return@LaunchedEffect
+        if (!armed) return@LaunchedEffect
+        reconnect.reset()
         val url = graph.streams.live(p, ch).url
-        previewFailed = false
-        if (previewRetry == 0 && PlayerFactory.isLoaded(player, url)) {
+        if (PlayerFactory.isLoaded(player, url)) {
             player.playWhenReady = true
             return@LaunchedEffect
         }
-        if (previewRetry > 0) delay(2_000)
         // Una sola conexión de vídeo por cuenta: para cualquier otro reproductor antes de empezar.
         graph.players.claimStream(player)
         player.setMediaItem(PlayerFactory.mediaItem(url))
         player.prepare()
         player.playWhenReady = true
     }
-    // Al entrar, previsualiza el primer canal. (En la TV se espera al primer OK; en el móvil la
-    // previsualización está siempre a la vista y se llena sola.)
-    LaunchedEffect(channels.firstOrNull()?.streamId) {
-        if (vm.previewChannel.value == null) channels.firstOrNull()?.let(vm::preview)
+    // Al entrar, previsualiza el primer canal si puede sonar. (En la TV se espera al primer OK; en
+    // el móvil la previsualización está siempre a la vista y se llena sola.)
+    LaunchedEffect(channels.firstOrNull()?.streamId, armed) {
+        if (armed && vm.previewChannel.value == null) channels.firstOrNull()?.let(vm::preview)
     }
     // La EPG que se muestra es la del canal que suena.
     LaunchedEffect(preview?.streamId) { preview?.let(vm::onChannelFocused) }
@@ -189,10 +196,13 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     }
     fun tapChannel(list: List<ChannelEntity>, index: Int) {
         val ch = list[index]
-        if (ch.streamId == preview?.streamId) watch(list, index) else vm.preview(ch)
+        if (ch.streamId == preview?.streamId && armed) watch(list, index) else vm.preview(ch)
+        armed = true
     }
     fun watchPreview() {
+        if (!armed) { armed = true; return }
         val ch = preview ?: return
+        if (reconnect.failed) { reconnect.retryNow(); return }
         val index = channels.indexOfFirst { it.streamId == ch.streamId }
         if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
     }
@@ -204,8 +214,10 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         PreviewVideo(
             player = player,
             channel = preview,
+            armed = armed,
             loading = previewState != Player.STATE_READY,
-            failed = previewFailed,
+            attempt = reconnect.attempt,
+            failed = reconnect.failed,
             onClick = ::watchPreview,
             modifier = modifier,
         )
@@ -333,12 +345,29 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
 
 /** Previsualización 16:9: el vídeo debajo y el toque encima (nunca el vídeo dentro de la superficie). */
 @Composable
-private fun PreviewVideo(player: Player, channel: ChannelEntity?, loading: Boolean, failed: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun PreviewVideo(
+    player: Player,
+    channel: ChannelEntity?,
+    armed: Boolean,
+    loading: Boolean,
+    attempt: Int,
+    failed: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
     Box(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
-        if (channel != null) VideoSurface(player, Modifier.fillMaxSize())
+        if (channel != null && armed) VideoSurface(player, Modifier.fillMaxSize())
         when {
+            !armed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
+                LText(if (channel == null) "Toca un canal para verlo aquí" else "Toca para ver", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f))
+            }
             channel == null -> Unit
-            failed -> LText("No disponible", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.align(Alignment.Center))
+            failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                LText("No disponible", style = Lumen.type.headline, color = Color.White)
+                LText("Toca para reintentar", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f))
+            }
+            attempt > 0 -> ReconnectPill(attempt, Modifier.align(Alignment.Center))
             loading -> LoadingSpinner(Modifier.align(Alignment.Center))
         }
         TapSurface(onClick = onClick, modifier = Modifier.fillMaxSize(), radius = LumenDimens.radiusMedium, color = Color.Transparent) {
@@ -352,7 +381,7 @@ private fun PreviewVideo(player: Player, channel: ChannelEntity?, loading: Boole
                         .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f))
                         .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
-                Icon(
+                if (armed && !failed) Icon(
                     Icons.Rounded.Fullscreen, contentDescription = "Pantalla completa", tint = Color.White,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
                         .clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.55f)).padding(6.dp).size(20.dp),
@@ -421,7 +450,7 @@ private fun CategoryChips(categories: List<CategoryItem>, selected: String, onSe
 @Composable
 private fun CategoryChip(cat: CategoryItem, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val c = Lumen.colors
-    TapSurface(onClick = onClick, onLongClick = onLongClick, radius = 50.dp, color = if (selected) c.accent else c.surface, modifier = Modifier.heightIn(min = 40.dp)) {
+    TapSurface(onClick = onClick, onLongClick = onLongClick, radius = 50.dp, color = if (selected) c.accent else c.surface, modifier = Modifier.minimumInteractiveComponentSize().heightIn(min = 40.dp)) {
         Row(Modifier.align(Alignment.Center).padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             if (cat.locked) Icon(Icons.Rounded.Lock, contentDescription = "Bloqueada", tint = if (selected) c.onAccent else c.textSecondary, modifier = Modifier.size(14.dp))
             LText(cat.name, style = Lumen.type.callout, color = if (selected) c.onAccent else c.textPrimary, maxLines = 1)
@@ -479,7 +508,15 @@ private fun ChannelList(
         return
     }
     val listState = rememberLazyListState()
-    LaunchedEffect(resetKey) { listState.scrollToItem(0) }
+    // Solo al cambiar de categoría o calidad: al volver a la pantalla (del reproductor o de otra
+    // pestaña) la lista se queda donde estaba.
+    var lastKey by rememberSaveable { mutableStateOf(resetKey.toString()) }
+    LaunchedEffect(resetKey) {
+        if (resetKey.toString() != lastKey) {
+            lastKey = resetKey.toString()
+            listState.scrollToItem(0)
+        }
+    }
     LazyColumn(modifier.fillMaxWidth(), state = listState, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
         itemsIndexed(channels, key = { _, ch -> ch.streamId }) { index, ch ->
             ChannelRow(
@@ -508,6 +545,8 @@ private fun ChannelRow(
     val graph = LocalGraph.current
     val c = Lumen.colors
     val now by produceState<Program?>(null, channel.streamId, playlist?.id) {
+        // Al desplazar deprisa las filas pasan de largo: solo piden la EPG las que se quedan a la vista.
+        delay(EPG_ROW_DELAY_MS)
         value = playlist?.let { p -> runCatching { graph.epg.nowAndNext(p, channel, 1).firstOrNull() }.getOrNull() }
     }
     TapSurface(
@@ -525,7 +564,7 @@ private fun ChannelRow(
                     if (isPreviewing) Icon(Icons.Rounded.PlayArrow, contentDescription = "En la previsualización", tint = c.accent, modifier = Modifier.size(16.dp))
                     LText(channel.name, style = Lumen.type.callout.copy(fontWeight = Lumen.type.headline.fontWeight), color = if (isPreviewing) c.accent else c.textPrimary, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
                     if (isFavorite) Icon(Icons.Rounded.Favorite, contentDescription = "Favorito", tint = c.accent, modifier = Modifier.size(14.dp))
-                    if (channel.tvArchive) Icon(Icons.Rounded.History, contentDescription = "Catch-up", tint = c.warning, modifier = Modifier.size(14.dp))
+                    if (channel.tvArchive) Icon(Icons.Rounded.History, contentDescription = "Catch-up", tint = c.textSecondary, modifier = Modifier.size(14.dp))
                 }
                 val p = now
                 if (p != null) {

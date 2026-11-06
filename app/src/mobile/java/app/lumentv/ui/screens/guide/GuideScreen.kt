@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -53,6 +54,7 @@ import app.lumentv.data.epg.Program
 import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.components.Artwork
+import app.lumentv.ui.components.EPG_ROW_DELAY_MS
 import app.lumentv.ui.components.FilterChip
 import app.lumentv.ui.components.LText
 import app.lumentv.ui.components.OptionsSheet
@@ -66,6 +68,7 @@ import app.lumentv.ui.play
 import app.lumentv.ui.playChannels
 import app.lumentv.ui.screens.live.LiveViewModel
 import app.lumentv.ui.theme.Lumen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Ventana de la parrilla: desde una hora antes de ahora hasta siete después (8 h desplazables). */
@@ -95,8 +98,21 @@ fun GuideScreen(nav: Navigator, insets: PaddingValues) {
     val fmt = remember(settings.use24h, settings.epgOffsetHours) { TimeFormatter(settings.use24h, settings.epgOffsetHours * 3_600_000L) }
     val c = Lumen.colors
 
-    val windowStart = remember { alignHalfHour(System.currentTimeMillis()) - BEFORE_MIN * 60_000L }
+    // La hora avanza con la pantalla abierta: la línea de «ahora» y el programa en emisión se mueven
+    // cada 30 s, y la ventana se adelanta cuando «ahora» se acerca a su final.
+    val now by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(30_000)
+            value = System.currentTimeMillis()
+        }
+    }
+    var windowStart by remember { mutableLongStateOf(alignHalfHour(System.currentTimeMillis()) - BEFORE_MIN * 60_000L) }
     val windowEnd = windowStart + WINDOW_MIN * 60_000L
+    LaunchedEffect(now >= windowEnd - BEFORE_MIN * 60_000L) {
+        if (now >= windowEnd - BEFORE_MIN * 60_000L) windowStart = alignHalfHour(now) - BEFORE_MIN * 60_000L
+    }
+    // Las filas crecen con el tamaño de letra del sistema en vez de cortar el texto.
+    val rowHeight = ROW_HEIGHT * LocalDensity.current.fontScale.coerceAtLeast(1f)
     var detail by remember { mutableStateOf<Pair<ChannelEntity, Program>?>(null) }
     val visibleCategories = categories.filterNot { it.locked && vm.isCategoryLocked(it.id) }
     val hScroll = rememberScrollState()
@@ -125,7 +141,7 @@ fun GuideScreen(nav: Navigator, insets: PaddingValues) {
                 scope.launch { hScroll.animateScrollTo(with(density) { target.roundToPx() }.coerceAtLeast(0)) }
             }
             // Al entrar, la parrilla empieza un cuarto de hora antes de ahora.
-            LaunchedEffect(pxPerMin) {
+            LaunchedEffect(pxPerMin, windowStart) {
                 val target = pxPerMin * ((System.currentTimeMillis() - windowStart) / 60_000f - 15f)
                 hScroll.scrollTo(with(density) { target.roundToPx() }.coerceAtLeast(0))
             }
@@ -158,6 +174,8 @@ fun GuideScreen(nav: Navigator, insets: PaddingValues) {
                                 from = windowStart,
                                 to = windowEnd,
                                 fmt = fmt,
+                                now = now,
+                                rowHeight = rowHeight,
                                 channelCol = channelCol,
                                 pxPerMin = pxPerMin,
                                 fullWidth = fullWidth,
@@ -169,7 +187,7 @@ fun GuideScreen(nav: Navigator, insets: PaddingValues) {
                     }
                     // Línea de «ahora»: se coloca en la fase de layout (leer el scroll aquí recompondría la
                     // parrilla en cada fotograma) y se recorta a la zona de programas.
-                    val nowPx = with(density) { (pxPerMin * ((System.currentTimeMillis() - windowStart) / 60_000f)).roundToPx() }
+                    val nowPx = with(density) { (pxPerMin * ((now - windowStart) / 60_000f)).roundToPx() }
                     Box(Modifier.padding(start = channelCol).fillMaxSize().clipToBounds()) {
                         Box(
                             Modifier.fillMaxHeight().width(2.dp)
@@ -209,6 +227,8 @@ private fun GuideRow(
     from: Long,
     to: Long,
     fmt: TimeFormatter,
+    now: Long,
+    rowHeight: Dp,
     channelCol: Dp,
     pxPerMin: Dp,
     fullWidth: Dp,
@@ -219,9 +239,11 @@ private fun GuideRow(
     val graph = LocalGraph.current
     val c = Lumen.colors
     val programs by produceState(emptyList<Program>(), channel.streamId, from, playlist?.id) {
+        // Al desplazar deprisa las filas pasan de largo: solo piden la EPG las que se quedan a la vista.
+        delay(EPG_ROW_DELAY_MS)
         value = playlist?.let { runCatching { graph.epg.programs(it, channel, from, to) }.getOrDefault(emptyList()) }.orEmpty()
     }
-    Row(Modifier.height(ROW_HEIGHT), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.height(rowHeight), verticalAlignment = Alignment.CenterVertically) {
         // Columna fija: no se desplaza en horizontal.
         TapSurface(onClick = onChannel, modifier = Modifier.width(channelCol).fillMaxHeight().padding(start = 8.dp, end = 4.dp), radius = 10.dp) {
             Column(Modifier.fillMaxSize().padding(6.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -236,7 +258,6 @@ private fun GuideRow(
                         LText("Sin información", style = Lumen.type.caption, color = c.textTertiary, modifier = Modifier.padding(start = 12.dp))
                     }
                 }
-                val now = System.currentTimeMillis()
                 programs.forEach { prog ->
                     val start = maxOf(prog.startAt, from)
                     val end = minOf(prog.stopAt, to)

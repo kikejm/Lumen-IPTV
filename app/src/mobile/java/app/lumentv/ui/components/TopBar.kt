@@ -13,6 +13,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
+import app.lumentv.ui.adaptive.LocalWidthClass
+import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.vpn.VpnState
 
@@ -45,10 +48,13 @@ fun TopBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // En vertical el título comparte ~200 dp con la píldora y dos botones: a 30 sp se cortaba
+        // («TV en directo», «Test de velocidad»). Ahí baja a `title` y la píldora no lleva el servidor.
+        val compact = LocalWidthClass.current == WidthClass.Compact
         if (showBack) IconCircleButton(Icons.AutoMirrored.Rounded.ArrowBack, "Atrás", onClick = { onBack?.invoke() ?: nav.back() })
-        LText(title, style = Lumen.type.largeTitle, maxLines = 1, modifier = Modifier.weight(1f))
+        LText(title, style = if (compact) Lumen.type.title else Lumen.type.largeTitle, maxLines = 1, modifier = Modifier.weight(1f))
         if (showActions) {
-            VpnPill(onClick = { nav.go(Routes.VPN) })
+            VpnPill(onClick = { nav.go(Routes.VPN) }, showServer = !compact)
             IconCircleButton(Icons.Rounded.Search, "Buscar", onClick = { nav.go(Routes.SEARCH) })
             IconCircleButton(Icons.Rounded.Settings, "Ajustes", onClick = { nav.go(Routes.SETTINGS) })
         }
@@ -60,18 +66,19 @@ fun TopBar(
  * (ARCHITECTURE.md → invariantes); antes, naranja.
  */
 @Composable
-fun VpnPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun VpnPill(onClick: () -> Unit, modifier: Modifier = Modifier, showServer: Boolean = true) {
     val graph = LocalGraph.current
     val state by graph.vpn.state.collectAsState()
     val stats by graph.vpn.stats.collectAsState()
     val c = Lumen.colors
     val (dot, label) = when (val s = state) {
-        is VpnState.Connected -> (if ((stats?.lastHandshakeMs ?: 0) > 0) c.success else c.warning) to "VPN · ${s.server.name}"
-        is VpnState.Connecting -> c.warning to "Conectando…"
+        is VpnState.Connected -> (if ((stats?.lastHandshakeMs ?: 0) > 0) c.success else c.warning) to (if (showServer) "VPN · ${s.server.name}" else "VPN")
+        is VpnState.Connecting -> c.warning to (if (showServer) "Conectando…" else "VPN")
         is VpnState.Failed -> c.danger to "VPN · error"
         VpnState.Disconnected -> c.textTertiary to "VPN"
     }
-    TapSurface(onClick = onClick, modifier = modifier.defaultMinSize(minHeight = 40.dp).widthIn(max = 170.dp), radius = 50.dp) {
+    // 40 dp a la vista, pero 48 dp de zona táctil (DESIGN-MOBILE.md).
+    TapSurface(onClick = onClick, modifier = modifier.minimumInteractiveComponentSize().defaultMinSize(minHeight = 40.dp).widthIn(max = 170.dp), radius = 50.dp) {
         Row(
             Modifier.align(Alignment.Center).padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,

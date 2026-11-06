@@ -45,14 +45,17 @@ import app.lumentv.ui.theme.Lumen
  * (`PlayerFactory.claimStream` para este reproductor), la barra se cierra sola.
  */
 @Stable
-class MiniPlayerController {
+class MiniPlayerController(
+    /** Antes de liberar el reproductor: guarda en el historial el minuto en que se quedó (películas y episodios). */
+    private val onRelease: (ExoPlayer, PlayItem) -> Unit = { _, _ -> },
+) {
     var player: ExoPlayer? by mutableStateOf(null)
         private set
     var item: PlayItem? by mutableStateOf(null)
         private set
 
     fun dock(player: ExoPlayer, item: PlayItem) {
-        if (this.player !== player) this.player?.release()
+        if (this.player !== player) close()
         this.player = player
         this.item = item
     }
@@ -64,9 +67,12 @@ class MiniPlayerController {
     }
 
     fun close() {
-        player?.release()
+        val p = player
+        val playing = item
         player = null
         item = null
+        if (p != null && playing != null) runCatching { onRelease(p, playing) }
+        p?.release()
     }
 }
 

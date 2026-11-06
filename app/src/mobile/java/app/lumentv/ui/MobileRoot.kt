@@ -40,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.C
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -48,7 +50,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import app.lumentv.MobileActivity
+import app.lumentv.data.db.ContentKind
+import app.lumentv.data.db.HistoryEntity
 import app.lumentv.di.AppGraph
+import app.lumentv.player.PlayItem
 import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.adaptive.currentWidthClass
@@ -56,28 +61,29 @@ import app.lumentv.ui.components.LText
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
-import app.lumentv.ui.screens.catchup.CatchupScreen
-import app.lumentv.ui.screens.guide.GuideScreen
-import app.lumentv.ui.screens.home.HomeScreen
-import app.lumentv.ui.screens.player.PlayerScreen
 import app.lumentv.ui.player.LocalMiniPlayer
 import app.lumentv.ui.player.MiniPlayerBar
 import app.lumentv.ui.player.MiniPlayerController
-import app.lumentv.ui.screens.search.SearchScreen
+import app.lumentv.ui.screens.catchup.CatchupScreen
+import app.lumentv.ui.screens.guide.GuideScreen
+import app.lumentv.ui.screens.home.HomeScreen
 import app.lumentv.ui.screens.live.LiveScreen
+import app.lumentv.ui.screens.multiview.MultiViewScreen
+import app.lumentv.ui.screens.player.PlayerScreen
+import app.lumentv.ui.screens.playlist.PlaylistEditScreen
+import app.lumentv.ui.screens.search.SearchScreen
+import app.lumentv.ui.screens.settings.SPEED_TEST_ROUTE
+import app.lumentv.ui.screens.settings.SettingsScreen
+import app.lumentv.ui.screens.settings.SpeedTestScreen
 import app.lumentv.ui.screens.vod.MovieDetailScreen
 import app.lumentv.ui.screens.vod.MoviesScreen
 import app.lumentv.ui.screens.vod.SeriesDetailScreen
 import app.lumentv.ui.screens.vod.SeriesScreen
-import app.lumentv.ui.screens.multiview.MultiViewScreen
-import app.lumentv.ui.screens.playlist.PlaylistEditScreen
-import app.lumentv.ui.screens.settings.SPEED_TEST_ROUTE
-import app.lumentv.ui.screens.settings.SettingsScreen
-import app.lumentv.ui.screens.settings.SpeedTestScreen
 import app.lumentv.ui.screens.vpn.ConfImport
 import app.lumentv.ui.screens.vpn.VpnScreen
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenTheme
+import kotlinx.coroutines.launch
 
 /** Destinos de la navegación principal (barra inferior en vertical, raíl en horizontal). */
 private data class MainDestination(val route: String, val label: String, val icon: ImageVector)
@@ -99,7 +105,7 @@ fun catchupRoute(channelId: String) = "${Routes.CATCHUP}?ch=$channelId"
 
 @Composable
 fun MobileRoot(graph: AppGraph) {
-    val mini = remember { MiniPlayerController() }
+    val mini = remember { MiniPlayerController { player, item -> saveMiniProgress(graph, player, item) } }
     CompositionLocalProvider(LocalGraph provides graph, LocalWidthClass provides currentWidthClass(), LocalMiniPlayer provides mini) {
         LumenTheme {
             // ¿Hay alguna lista? Si no, se empieza en el alta de lista (onboarding).
@@ -114,6 +120,33 @@ fun MobileRoot(graph: AppGraph) {
     }
 }
 
+/**
+ * Al cerrar el mini reproductor (o pararlo otro stream) se apunta el minuto de la película o el
+ * episodio: si no, al reanudar volvía al punto en que se salió de pantalla completa.
+ */
+private fun saveMiniProgress(graph: AppGraph, player: ExoPlayer, item: PlayItem) {
+    if (item.kind == ContentKind.LIVE) return
+    val duration = player.duration
+    if (duration == C.TIME_UNSET || duration <= 0) return
+    val position = player.currentPosition.coerceAtLeast(0)
+    graph.appScope.launch {
+        val p = graph.playlists.activeNow() ?: return@launch
+        graph.library.record(
+            HistoryEntity(
+                playlistId = p.id,
+                kind = item.kind,
+                itemId = item.itemId,
+                title = item.title,
+                subtitle = item.subtitle,
+                image = item.image,
+                positionMs = position,
+                durationMs = duration,
+                extra = item.extra,
+            ),
+        )
+    }
+}
+
 @Composable
 private fun MobileNavHost(startOnboarding: Boolean) {
     val controller = rememberNavController()
@@ -125,10 +158,22 @@ private fun MobileNavHost(startOnboarding: Boolean) {
     val showNav = route in MainRoutes
 
     // Un .conf abierto o compartido desde otra app se importa en MobileActivity; aquí se lleva al
-    // usuario a la pantalla VPN, que muestra el resultado.
+    // usuario a la pantalla VPN, que muestra el resultado. Las importaciones hechas desde la propia
+    // pantalla VPN no navegan: si terminan cuando el usuario ya se ha ido, el aviso espera a que vuelva.
     val confNotice by ConfImport.notice.collectAsState()
     LaunchedEffect(confNotice, route == null) {
-        if (confNotice != null && route != null && route != Routes.VPN) nav.go(Routes.VPN)
+        if (confNotice?.fromOtherApp == true && route != null && route != Routes.VPN) nav.go(Routes.VPN)
+    }
+
+    // Sin ninguna lista (se ha borrado la última en Ajustes) se vuelve al alta de lista.
+    val graph = LocalGraph.current
+    val mini = LocalMiniPlayer.current
+    val playlists by graph.playlists.playlists.collectAsState(initial = null)
+    LaunchedEffect(playlists?.isEmpty(), route == null) {
+        if (playlists?.isEmpty() == true && route != null && route != ONBOARDING) {
+            mini.close()
+            controller.navigate(ONBOARDING) { popUpTo(controller.graph.id) { inclusive = true } }
+        }
     }
 
     // En Inicio, el gesto atrás sale de la app (comportamiento estándar de Android; en el móvil
@@ -170,7 +215,6 @@ private fun MobileNavHost(startOnboarding: Boolean) {
     var sides = WindowInsetsSides.Top + WindowInsetsSides.End
     if (!showRail) sides += WindowInsetsSides.Start // el raíl ya respeta el recorte de cámara
     // Mini reproductor: sobre la barra inferior en cualquier pantalla salvo el propio reproductor.
-    val mini = LocalMiniPlayer.current
     val showMini = mini.player != null && route != Routes.PLAYER
     if (!showBottomBar && !showMini) sides += WindowInsetsSides.Bottom // la barra inferior (o el mini reproductor) ya respeta la de gestos
     val insets = WindowInsets.safeDrawing.only(sides).asPaddingValues()
@@ -253,21 +297,31 @@ private class NavigatorImpl(private val controller: NavHostController, private v
     override val previousRoute: String?
         get() = controller.previousBackStackEntry?.destination?.route
 
+    /**
+     * Pestañas (barra inferior, raíl y accesos de Inicio): como en las apps de Android, cada pestaña
+     * guarda su pila y su estado (categoría, desplazamiento) al cambiar a otra y lo recupera al volver.
+     */
     override fun replaceRoot(route: String) {
-        if (route == Routes.HOME || route !in MainRoutes) {
-            val popped = controller.popBackStack(Routes.HOME, inclusive = false)
-            if (!popped) {
-                controller.navigate(Routes.HOME) {
-                    popUpTo(controller.graph.id) { inclusive = true }
-                    launchSingleTop = true
-                }
+        val hasHome = runCatching { controller.getBackStackEntry(Routes.HOME) }.isSuccess
+        if (!hasHome) {
+            controller.navigate(Routes.HOME) {
+                popUpTo(controller.graph.id) { inclusive = true }
+                launchSingleTop = true
             }
             if (route != Routes.HOME) go(route)
             return
         }
+        if (route !in MainRoutes) {
+            controller.popBackStack(Routes.HOME, inclusive = false)
+            go(route)
+            return
+        }
+        // Solo se guarda el estado de una pestaña (no el de Ajustes o el alta de lista).
+        val fromTab = controller.currentDestination?.route in MainRoutes
         controller.navigate(route) {
-            popUpTo(Routes.HOME) { inclusive = false }
+            popUpTo(Routes.HOME) { saveState = fromTab }
             launchSingleTop = true
+            restoreState = true
         }
     }
 }
