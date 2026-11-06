@@ -175,6 +175,15 @@ Pantallas horizontales generadas en Stitch: `design/stitch-mobile/L01-inicio` �
 
 ### Fase 5 — VPN, ajustes y extras (2–3 días)
 
+**Hecha (6 nov 2026).** Antes se trajeron a la rama los cambios de la TV 1.0.5–1.0.7 (zoom, multipantalla ampliable, reintentos, «Pulse OK», foco al volver); `pipEnabled` vuelve a `AppSettings` porque lo usa el móvil, y `StreamReconnect` pasa a `src/main`. Hecho en la fase:
+- VPN (07-vpn / L07-vpn): estado, servidor, IP pública, tiempo y tráfico; «Solo esta app»; países y servidores (página aparte en vertical, tres columnas en horizontal). Si falla al conectar, se avisa de que Android solo admite una VPN a la vez. No hay latencia ni carga por servidor: Proton no las da sin login.
+- Importar `.conf`: selector de ficheros (varios), URL, y «Abrir con» / «Compartir» desde otra app (fichero, texto del `.conf` o enlace). La pantalla VPN muestra el resultado.
+- Ajustes (08-ajustes / L08-ajustes): Listas, Reproductor, Guía EPG, VPN, Datos móviles, Control parental, Herramientas y Acerca de; lista única en vertical, maestro-detalle en horizontal. Test de velocidad como pantalla propia (15-test-velocidad), sin historial de tests.
+- Datos móviles: sin actualización automática de catálogo/EPG en red de uso medido (ajustable) y aviso una vez por sesión al reproducir. Solo en el sabor `mobile`.
+- Multipantalla: 2 vídeos (4 en tableta), audio en el tocado, ampliar, cambiar o quitar canal.
+
+Pendiente de probar en un móvil real (el contenedor de desarrollo no tiene SDK de Android: se compila en GitHub Actions): conectar la VPN y ver la IP, abrir un `.conf` desde Archivos, girar en multipantalla.
+
 - Pantalla VPN táctil (misma lógica de `VpnManager`; «Conectado» solo tras handshake).
 - Importar `.conf` con el selector de ficheros (SAF) y recibirlos desde «Compartir» (`ACTION_SEND`/`ACTION_VIEW`). El `ImportServer` no se incluye en `mobile`.
 - Aviso de datos móviles (calidad/bufer al usar red móvil, `ConnectivityManager`).

@@ -91,6 +91,8 @@ Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale 
 - **Girar el móvil** en el reproductor entra o sale de pantalla completa **sin cortar el vídeo**. El botón de pantalla completa fuerza horizontal y lo libera al salir.
 - Al salir del reproductor con algo sonando: **mini reproductor** de 64 dp sobre la barra inferior (vídeo, canal, pausa, cerrar). Al salir de la app: PiP automático (Android 12+) si está activo en Ajustes.
 - Reconexión del reproductor igual que en TV: 5 intentos cada 3 s, última imagen congelada y píldora «Error de reproducción, vuelve a conectar en 3 s (1/5)»; agotados, panel con «Reintentar» / «Otro canal» / «Volver».
+- Multipantalla: 2 vídeos en móvil (apilados en vertical, lado a lado en horizontal) y 4 en tableta. Tocar un vídeo le da el audio (anillo blanco); pulsación larga o «⋯» = cambiar canal, ampliar, quitar. Reconexión como en la TV (`StreamReconnect`).
+- VPN: los `.conf` se importan con el selector de ficheros, una URL o «Abrir con»/«Compartir» desde otra app; tras importar se muestra el resultado en la pantalla VPN.
 - Salir: en Inicio, el gesto atrás sale de la app directamente (en móvil no hace falta el «pulsa de nuevo para salir» de la TV).
 
 ## Elevation & Depth
@@ -114,6 +116,8 @@ Viven en `app/src/mobile/java/app/lumentv/ui/components/`. Pueden usar Material 
 - `OptionsSheet` — opciones contextuales: hoja inferior en *Compact*, lateral en *Medium/Expanded*.
 - `PinSheet` — PIN parental con teclado numérico propio (no el del sistema).
 - `ConfirmDialog`, `EmptyState` (icono, título, texto, acción), `ErrorState` (icono naranja, mensaje en español, «Reintentar» + acciones alternativas).
+- `GroupCard` + `SettingRow` / `SwitchRow` (`LumenSwitch`) — listas agrupadas de Ajustes, separadas por `RowDivider`. Valores de una lista corta se eligen en una hoja con opciones de radio, no pasando valores como en la TV.
+- `TextInputSheet` (un campo + «Guardar»), `NoticePill` (aviso de 4 s abajo al centro) y `ReconnectPill` (sobre vídeos pequeños).
 - `MiniPlayer`, `PlayerControls` (gestos), `VideoSurface` (fuera de cualquier superficie con capa propia, igual que en TV).
 - `AdaptivePanes` — una columna / dos o tres paneles según `WindowSizeClass`.
 

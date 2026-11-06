@@ -29,9 +29,9 @@ Proton .conf ──▶ VpnServerRepository (cifrado) ──▶ VpnManager ──
 
 El módulo `:app` tiene dos sabores (`productFlavors`, dimensión `device`):
 
-- `src/main` — núcleo compartido: todo lo de abajo salvo la UI, más los tokens del tema (`ui/theme/Theme.kt`), las rutas (`ui/navigation`) y los ViewModels (`LiveViewModel`, `VodViewModels`).
+- `src/main` — núcleo compartido: todo lo de abajo salvo la UI, más los tokens del tema (`ui/theme/Theme.kt`), las rutas (`ui/navigation`), los ViewModels (`LiveViewModel`, `VodViewModels`) y la lógica de reconexión de vídeos pequeños (`ui/components/StreamReconnect`; cada UI dibuja su `ReconnectPill`).
 - `src/tv` — `MainActivity` y la UI de Compose for TV (`ui/components`, `ui/screens`, `LumenRoot`, `Launch.kt`, `LumenTheme`). `applicationId` `app.lumentv`.
-- `src/mobile` — `MobileActivity` y la UI táctil con Material 3 (en desarrollo, `docs/PLAN-MOVIL.md`; diseño en `DESIGN-MOBILE.md`). `MobileRoot` (NavHost + barra inferior o raíl según `ui/adaptive/WidthClass`), `ui/components` (táctiles: `TapSurface`, hojas, campos) y `ui/screens`. `applicationId` `app.lumentv.mobile`.
+- `src/mobile` — `MobileActivity` y la UI táctil con Material 3 (en desarrollo, `docs/PLAN-MOVIL.md`; diseño en `DESIGN-MOBILE.md`). `MobileRoot` (NavHost + barra inferior o raíl según `ui/adaptive/WidthClass`), `ui/components` (táctiles: `TapSurface`, hojas, filas de ajustes, campos) y `ui/screens`. Los `.conf` llegan por el selector de ficheros o por «Abrir con»/«Compartir» (`MobileActivity.importShared` → `screens/vpn/ConfImport`); el `ImportServer` no se usa en el móvil. `applicationId` `app.lumentv.mobile`.
 
 Los paquetes Kotlin son los mismos en los tres; lo de abajo cuelga de `app/src/<sabor>/java/app/lumentv/`.
 
