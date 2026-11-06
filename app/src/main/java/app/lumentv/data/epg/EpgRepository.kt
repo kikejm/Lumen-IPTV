@@ -1,5 +1,6 @@
 package app.lumentv.data.epg
 
+import app.lumentv.core.net.withDownloadedFile
 import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.LumenDatabase
 import app.lumentv.data.db.PlaylistEntity
@@ -9,18 +10,19 @@ import app.lumentv.data.playlist.PlaylistRepository
 import app.lumentv.data.settings.SettingsRepository
 import app.lumentv.data.xtream.XtreamClient
 import app.lumentv.data.xtream.XtreamEpgEntry
+import java.io.File
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import app.lumentv.core.net.withDownloadedFile
-import java.io.File
-import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 
 data class Program(val title: String, val description: String, val startAt: Long, val stopAt: Long, val hasArchive: Boolean = false) {
     fun isLive(now: Long = System.currentTimeMillis()) = now in startAt until stopAt
@@ -117,7 +119,7 @@ class EpgRepository(
         val key = channel.epgChannelId.lowercase(Locale.ROOT)
         if (key.isNotEmpty()) {
             val stored = db.programs().programs(p.id, key, from, to)
-            if (stored.isNotEmpty()) return stored.map { Program(it.title, it.description, it.startAt, it.stopAt) }
+            if (stored.isNotEmpty()) return stored.map { Program(it.title, it.description, it.startAt, it.stopAt) }.distinctBy { it.startAt }
         }
         if (p.type != PlaylistType.XTREAM) return emptyList()
         return shortEpg(p, channel).filter { it.stopAt > from && it.startAt < to }
@@ -137,23 +139,39 @@ class EpgRepository(
             .getOrDefault(emptyList())
             .filter { it.stopAt < now && (it.hasArchive || channel.tvArchive) }
             .map { it.toProgram() }
+            .distinctBy { it.startAt } // algunos paneles repiten programas; la UI los usa como clave
             .sortedByDescending { it.startAt }
     }
 
+    /**
+     * Cada fila de una lista de canales pide su EPG al componerse: al desplazar deprisa salían decenas
+     * de peticiones a la vez y el panel las corta. Como mucho [SHORT_EPG_PARALLEL] a la vez; la que
+     * espera vuelve a mirar la caché por si otra ya trajo el mismo canal.
+     */
+    private val shortEpgPermits = Semaphore(SHORT_EPG_PARALLEL)
+
     private suspend fun shortEpg(p: PlaylistEntity, channel: ChannelEntity): List<Program> {
         val cacheKey = "${p.id}:${channel.streamId}"
-        shortCache[cacheKey]?.takeIf { System.currentTimeMillis() - it.at < 10 * 60_000 }?.let { return it.programs }
-        val list = runCatching { xtream.shortEpg(playlists.credentials(p), channel.streamId, 8) }
-            .getOrDefault(emptyList())
-            .map { it.toProgram() }
-        shortCache[cacheKey] = CacheEntry(System.currentTimeMillis(), list)
-        return list
+        cachedShortEpg(cacheKey)?.let { return it }
+        return shortEpgPermits.withPermit {
+            cachedShortEpg(cacheKey)?.let { return@withPermit it }
+            val list = runCatching { xtream.shortEpg(playlists.credentials(p), channel.streamId, 8) }
+                .getOrDefault(emptyList())
+                .map { it.toProgram() }
+                .distinctBy { it.startAt }
+            shortCache[cacheKey] = CacheEntry(System.currentTimeMillis(), list)
+            list
+        }
     }
+
+    private fun cachedShortEpg(key: String): List<Program>? =
+        shortCache[key]?.takeIf { System.currentTimeMillis() - it.at < 10 * 60_000 }?.programs
 
     private fun XtreamEpgEntry.toProgram() = Program(title, description, startAt, stopAt, hasArchive)
 
     private companion object {
         const val HOUR = 3_600_000L
         const val BATCH = 1000
+        const val SHORT_EPG_PARALLEL = 4
     }
 }
