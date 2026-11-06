@@ -124,14 +124,14 @@ base64 -w 0 keystore/lumen-release.jks > keystore.b64
 
 ### Cómo se actualiza el Fire TV
 
-- Al abrir Lumen (como mucho cada 12 h) comprueba la última Release. Si hay versión nueva verás un aviso en Inicio.
+- Al abrir Lumen, y cada 15 minutos mientras está abierta, comprueba la última Release. Si hay versión nueva verás un aviso en Inicio, que sigue saliendo hasta que la instales: «Ocultar» lo quita solo hasta la próxima vez que entres en la app.
 - **Ajustes → Actualizaciones → Descargar e instalar**. La primera vez Fire OS pedirá permitir a Lumen *instalar apps desconocidas*: actívalo y vuelve a pulsar.
 - También puedes actualizar desde el PC con `adb install -r` (conserva datos y ajustes).
 
 ### Instalar y actualizar en el móvil
 
 - **Instalar**: en el móvil abre la última Release en GitHub, descarga `lumen-mobile-X.Y.Z.apk` y ábrelo. Android pedirá permitir *instalar apps desconocidas* al navegador (o a Archivos): actívalo y vuelve. Es una app aparte de la de la tele (`app.lumentv.mobile`).
-- **Actualizar**: igual que en la tele, al abrir la app comprueba la última Release (como mucho cada 12 h) y muestra un aviso en Inicio; tócalo, o ve a *Ajustes → Acerca de → Instalar*. La primera vez Android pide permitir a IPTV instalar apps.
+- **Actualizar**: igual que en la tele, al abrir la app (y cada 15 minutos mientras está abierta) comprueba la última Release y muestra un aviso en Inicio hasta que la instales (la ✕ lo oculta hasta la próxima vez que entres); tócalo, o ve a *Ajustes → Acerca de → Instalar*. La primera vez Android pide permitir a IPTV instalar apps.
 
 > ⚠️ Todas las versiones deben ir firmadas con el **mismo keystore** (`keystore/lumen-release.jks`). Guarda una copia de ese fichero y de su contraseña fuera del ordenador. Si se pierde, habrá que desinstalar Lumen (perdiendo ajustes) para instalar una versión firmada con otra clave.
 

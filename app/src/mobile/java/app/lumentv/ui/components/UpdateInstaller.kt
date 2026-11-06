@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import app.lumentv.di.AppGraph
 import app.lumentv.ui.navigation.LocalGraph
@@ -62,9 +64,12 @@ fun rememberUpdateInstaller(): UpdateInstaller {
     return remember(graph, scope) { UpdateInstaller(graph, scope) }
 }
 
-/** Aviso de Inicio cuando hay una versión nueva (como en la TV): tocarlo la descarga e instala. */
+/**
+ * Aviso de Inicio cuando hay una versión nueva (como en la TV): tocarlo la descarga e instala.
+ * La ✕ lo oculta hasta la próxima vez que se entre en la app ([onDismiss]).
+ */
 @Composable
-fun UpdateBanner(info: UpdateInfo, installer: UpdateInstaller, modifier: Modifier = Modifier) {
+fun UpdateBanner(info: UpdateInfo, installer: UpdateInstaller, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val c = Lumen.colors
     val progress = installer.progress
     TapSurface(
@@ -83,6 +88,9 @@ fun UpdateBanner(info: UpdateInfo, installer: UpdateInstaller, modifier: Modifie
                         style = Lumen.type.callout,
                         color = c.textSecondary,
                     )
+                }
+                if (progress == null) {
+                    IconCircleButton(Icons.Rounded.Close, "Ocultar aviso", onClick = onDismiss, color = Color.Transparent)
                 }
             }
             progress?.let { ProgressLine(it) }

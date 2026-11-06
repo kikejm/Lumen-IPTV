@@ -9,6 +9,7 @@ import androidx.core.content.FileProvider
 import app.lumentv.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -21,6 +22,7 @@ import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 
+@Serializable
 data class UpdateInfo(
     val versionCode: Int,
     val versionName: String,
