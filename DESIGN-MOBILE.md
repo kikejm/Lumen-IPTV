@@ -82,6 +82,7 @@ Alan Sans empaquetada (`res/font`): 800 para títulos, 400 para el resto. Sobre 
 | Ajustes | Lista de secciones → detalle | Maestro-detalle | Maestro-detalle |
 | Opciones (☰ en TV) | Hoja inferior | Hoja lateral derecha (360 dp) | Hoja lateral |
 
+- **Inicio**: si hay una versión nueva, un aviso en acento al 18 % bajo la barra superior (como en la TV); tocarlo descarga e instala el APK, con su barra de progreso.
 - **TV en directo**: al entrar, la previsualización arranca sola con el primer canal salvo que haya algo en el mini reproductor (la cuenta solo admite una conexión) o se esté con datos móviles; entonces muestra «Toca un canal para verlo aquí». Tocar otro canal lo pasa a la previsualización; tocar el que ya suena (o la previsualización) lo abre a pantalla completa sin recargar. Reconecta como la multipantalla (`StreamReconnect`); agotados los intentos, «No disponible · Toca para reintentar».
 - **Pestañas**: cada destino principal guarda su pila y su estado (categoría, desplazamiento) al cambiar de pestaña. Volver de una ficha o del reproductor deja las listas donde estaban.
 - **Barra superior en vertical**: título a 22 sp (`title`) y píldora VPN sin el nombre del servidor, para que el título no se corte.

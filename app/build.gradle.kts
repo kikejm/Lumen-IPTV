@@ -80,9 +80,9 @@ android {
             applicationIdSuffix = ".mobile"
             minSdk = 26
             targetSdk = 35
-            // Sin OTA hasta la fase 6: el canal de actualizaciones actual publica el APK de TV.
-            buildConfigField("String", "UPDATE_GITHUB_REPO", "\"\"")
-            buildConfigField("String", "UPDATE_MANIFEST_URL", "\"\"")
+            // OTA: misma Release de GitHub que la TV, pero con su manifiesto `update-mobile.json`
+            // (UpdateManager lo elige según BuildConfig.FLAVOR). La opción B tiene URL propia.
+            buildConfigField("String", "UPDATE_MANIFEST_URL", env("LUMEN_UPDATE_MOBILE_MANIFEST_URL").asBuildConfigString())
         }
     }
 

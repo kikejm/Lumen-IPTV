@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Sabor mobile (teléfonos y tabletas Android): se combina con src/main/AndroidManifest.xml. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
     <uses-feature android:name="android.software.picture_in_picture" android:required="false" />
 
-    <application>
+    <!--
+      Icono adaptativo (src/mobile/res/mipmap-anydpi-v26) con el mismo logo que la TV: en el móvil
+      el lanzador le da su forma.
+    -->
+    <application
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        tools:replace="android:icon">
         <!--
           Sin screenOrientation: la app funciona en vertical y en horizontal.
           configChanges evita recrear la Activity al girar (el vídeo no se corta).

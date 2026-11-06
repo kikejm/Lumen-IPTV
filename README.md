@@ -112,7 +112,9 @@ git tag v1.1.0
 git push origin main --tags
 ```
 
-3. GitHub Actions (`.github/workflows/release.yml`) compila, firma, y publica una Release con `lumen-1.1.0.apk` y `update.json` (versión + SHA-256).
+3. GitHub Actions (`.github/workflows/release.yml`) compila, firma, y publica una Release con la versión de la tele (`lumen-1.1.0.apk` + `update.json`) y la del móvil (`lumen-mobile-1.1.0.apk` + `update-mobile.json`), cada manifiesto con su versión y SHA-256. Las dos apps salen siempre con el mismo número de versión.
+
+Para probar los APK firmados antes de publicar: *Actions → Release → Run workflow*. Compila y firma igual, pero no crea ninguna Release: los APK quedan en el resumen del run (*Artifacts*).
 
 Secrets necesarios en GitHub (*Settings → Secrets and variables → Actions*): `LUMEN_KEYSTORE_BASE64` (el `.jks` en base64), `LUMEN_KEYSTORE_PASSWORD`, `LUMEN_KEY_ALIAS`, `LUMEN_KEY_PASSWORD` y, si el repo es privado, `LUMEN_UPDATE_GITHUB_TOKEN`. Para generar el base64 en Windows:
 
@@ -125,6 +127,11 @@ base64 -w 0 keystore/lumen-release.jks > keystore.b64
 - Al abrir Lumen (como mucho cada 12 h) comprueba la última Release. Si hay versión nueva verás un aviso en Inicio.
 - **Ajustes → Actualizaciones → Descargar e instalar**. La primera vez Fire OS pedirá permitir a Lumen *instalar apps desconocidas*: actívalo y vuelve a pulsar.
 - También puedes actualizar desde el PC con `adb install -r` (conserva datos y ajustes).
+
+### Instalar y actualizar en el móvil
+
+- **Instalar**: en el móvil abre la última Release en GitHub, descarga `lumen-mobile-X.Y.Z.apk` y ábrelo. Android pedirá permitir *instalar apps desconocidas* al navegador (o a Archivos): actívalo y vuelve. Es una app aparte de la de la tele (`app.lumentv.mobile`).
+- **Actualizar**: igual que en la tele, al abrir la app comprueba la última Release (como mucho cada 12 h) y muestra un aviso en Inicio; tócalo, o ve a *Ajustes → Acerca de → Instalar*. La primera vez Android pide permitir a IPTV instalar apps.
 
 > ⚠️ Todas las versiones deben ir firmadas con el **mismo keystore** (`keystore/lumen-release.jks`). Guarda una copia de ese fichero y de su contraseña fuera del ordenador. Si se pierde, habrá que desinstalar Lumen (perdiendo ajustes) para instalar una versión firmada con otra clave.
 
@@ -148,7 +155,8 @@ Comandos útiles:
 
 ```bash
 ./gradlew assembleTvDebug testTvDebugUnitTest
-./gradlew assembleMobileDebug   # versión móvil (en desarrollo, ver docs/PLAN-MOVIL.md)
+./gradlew assembleMobileDebug   # versión móvil (ver docs/PLAN-MOVIL.md)
+./gradlew assembleMobileRelease # APK del móvil: app/build/outputs/apk/mobile/release/app-mobile-release.apk
 ```
 
 Para probar sin tu lista real hay un panel Xtream de demostración en [`tools/mock-xtream/`](tools/mock-xtream/README.md).

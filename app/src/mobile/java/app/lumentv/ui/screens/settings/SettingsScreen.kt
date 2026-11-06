@@ -79,6 +79,7 @@ import app.lumentv.ui.components.SwitchRow
 import app.lumentv.ui.components.TapSurface
 import app.lumentv.ui.components.TextInputSheet
 import app.lumentv.ui.components.TopBar
+import app.lumentv.ui.components.rememberUpdateInstaller
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
@@ -500,19 +501,19 @@ private fun AboutSection() {
     val graph = LocalGraph.current
     val scope = rememberCoroutineScope()
     val available by graph.availableUpdate.collectAsState()
-    var status by remember { mutableStateOf<String?>(null) }
-    var progress by remember { mutableStateOf<Float?>(null) }
+    val installer = rememberUpdateInstaller()
+    val progress = installer.progress
     val c = Lumen.colors
 
     SettingRow("Versión", value = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
     if (graph.updater.isConfigured) {
         RowDivider()
-        SettingRow("Buscar actualizaciones", subtitle = status, icon = Icons.Rounded.SystemUpdate, onClick = {
-            status = "Buscando…"
+        SettingRow("Buscar actualizaciones", subtitle = installer.status, icon = Icons.Rounded.SystemUpdate, onClick = {
+            installer.status = "Buscando…"
             scope.launch {
                 graph.checkForUpdates(force = true)
-                    .onSuccess { status = if (it == null || !it.isNewer) "Estás en la última versión" else "Disponible ${it.versionName}" }
-                    .onFailure { status = "Error: ${it.message}" }
+                    .onSuccess { installer.status = if (it == null || !it.isNewer) "Estás en la última versión" else "Disponible ${it.versionName}" }
+                    .onFailure { installer.status = "Error: ${it.message}" }
             }
         })
         available?.let { info ->
@@ -522,19 +523,7 @@ private fun AboutSection() {
                 subtitle = info.notes.takeIf { it.isNotBlank() },
                 titleColor = c.accent,
                 enabled = progress == null,
-                onClick = {
-                    if (!graph.updater.canInstall()) {
-                        status = "Permite a IPTV instalar apps y vuelve a pulsar"
-                        graph.updater.openInstallPermissionSettings()
-                        return@SettingRow
-                    }
-                    progress = 0f
-                    scope.launch {
-                        runCatching { graph.updater.download(info) { progress = it } }
-                            .onSuccess { graph.updater.install(it); progress = null }
-                            .onFailure { status = "Error: ${it.message}"; progress = null }
-                    }
-                },
+                onClick = { installer.install(info) },
             )
             progress?.let { ProgressLine(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
         }

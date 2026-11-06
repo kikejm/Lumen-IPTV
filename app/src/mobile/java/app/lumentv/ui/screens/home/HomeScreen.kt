@@ -66,6 +66,8 @@ import app.lumentv.ui.components.SectionTitle
 import app.lumentv.ui.components.StatusDot
 import app.lumentv.ui.components.TapSurface
 import app.lumentv.ui.components.TopBar
+import app.lumentv.ui.components.UpdateBanner
+import app.lumentv.ui.components.rememberUpdateInstaller
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
@@ -102,6 +104,8 @@ fun HomeScreen(nav: Navigator, insets: PaddingValues) {
     val settings by graph.settings.settings.collectAsState()
     val sync by graph.catalog.syncState.collectAsState()
     val vpn by graph.vpn.state.collectAsState()
+    val update by graph.availableUpdate.collectAsState()
+    val installer = rememberUpdateInstaller()
     val pid = playlist?.id ?: -1L
 
     val history by remember(pid) { graph.library.history(pid, 12) }.collectAsState(initial = emptyList())
@@ -177,6 +181,7 @@ fun HomeScreen(nav: Navigator, insets: PaddingValues) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         TopBar(nav, "IPTV")
+        update?.let { UpdateBanner(it, installer) }
         when (widthClass) {
             // Vertical: una columna (Stitch 01-inicio).
             WidthClass.Compact -> {

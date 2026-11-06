@@ -41,6 +41,7 @@ export JAVA_HOME="$LOCALAPPDATA/Programs/jdk-17.0.20.1+1"; export PATH="$JAVA_HO
 - Inyección de dependencias manual en `di/AppGraph.kt`. No añadas Hilt/Koin.
 - Versiones de librerías solo en `gradle/libs.versions.toml`.
 - **Icono y banner del sabor `tv` en `res/drawable-*` (PNG), nunca en `mipmap` ni adaptativos**: el lanzador de Fire OS 7/8 no encuentra iconos `mipmap` de apps instaladas fuera de la tienda y muestra una imagen rota. Si cambias el icono, sube `lumen.versionCode`: Fire TV guarda en caché el icono anterior. El menú de Fire TV pinta `ic_launcher` en un cuadrado sobre el rectángulo gris e ignora `android:banner`: el icono debe ser cuadrado (uno 16:9 sale aplastado). Tras `adb install -r` sale la imagen rota (unos 15 s después) hasta reiniciar: espera a que salga y lanza entonces `adb reboot`, porque si reinicias antes el menú conserva el icono anterior. El nuevo aparece más o menos minuto y medio tras reiniciar; el lanzador no se puede cerrar por ADB.
+- El sabor `mobile` usa un **icono adaptativo** con el mismo logo cuadrado que la TV: `src/mobile/res/mipmap-anydpi-v26/ic_launcher.xml` con la imagen en `mipmap-*dpi/ic_launcher_background.png` (el logo ocupa los 72 dp visibles del lienzo de 108 dp; el margen es su borde estirado) y la capa frontal transparente. Si cambias el logo de la TV, regenera también estas PNG.
 
 ## VPN (lo más delicado)
 
@@ -51,7 +52,9 @@ export JAVA_HOME="$LOCALAPPDATA/Programs/jdk-17.0.20.1+1"; export PATH="$JAVA_HO
 
 ## Releases y actualizaciones
 
-- Sube `lumen.versionCode` (+1) y `lumen.versionName` en `gradle.properties`, crea tag `vX.Y.Z` y push: el workflow `.github/workflows/release.yml` compila, firma y publica APK + `update.json`.
+- Sube `lumen.versionCode` (+1) y `lumen.versionName` en `gradle.properties`, crea tag `vX.Y.Z` y push: el workflow `.github/workflows/release.yml` compila y firma los dos sabores y publica una sola Release con `lumen-X.Y.Z.apk` + `update.json` (TV) y `lumen-mobile-X.Y.Z.apk` + `update-mobile.json` (móvil). Cada versión sale para los dos a la vez: comparten `versionCode`.
+- `update.json` y el nombre `lumen-X.Y.Z.apk` no se cambian, y el APK de la TV se sube antes que el del móvil: las TV con la 1.0.10 o anterior buscan `update.json` y se bajan el primer `.apk` de la Release.
+- Lanzar `release.yml` a mano (*Run workflow*) compila y firma los dos APK y los deja como artefacto, **sin publicar nada**: sirve para probar una versión antes de etiquetarla.
 - **Nunca cambies el keystore** (`keystore/lumen-release.jks`): Android rechaza actualizaciones con otra firma.
 
 ## Verificación antes de dar algo por terminado

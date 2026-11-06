@@ -34,12 +34,15 @@ data class UpdateInfo(
 }
 
 /**
- * Actualizaciones OTA para sideload (Fire TV no tiene Play Store para esta app).
+ * Actualizaciones OTA para sideload (Fire TV no tiene Play Store para esta app, y el móvil se
+ * instala desde la Release).
  *
  * Fuente (por prioridad):
- *  1. GitHub Releases (`LUMEN_UPDATE_GITHUB_REPO`, token opcional para repos privados).
- *     La release debe incluir `update.json` y el `.apk` (lo genera el workflow `release.yml`).
- *  2. Un manifiesto JSON en cualquier URL (`LUMEN_UPDATE_MANIFEST_URL`).
+ *  1. GitHub Releases (`LUMEN_UPDATE_GITHUB_REPO`, token opcional para repos privados). La TV y el
+ *     móvil comparten Release; cada sabor lee su manifiesto ([ReleaseAssets.manifestName]) y
+ *     descarga el APK que nombra (lo genera el workflow `release.yml`).
+ *  2. Un manifiesto JSON en cualquier URL (`LUMEN_UPDATE_MANIFEST_URL` en la TV,
+ *     `LUMEN_UPDATE_MOBILE_MANIFEST_URL` en el móvil).
  *
  * El APK se verifica con SHA-256 y se instala con el instalador del sistema. Android exige
  * que esté firmado con la misma clave que la versión instalada.
@@ -61,11 +64,17 @@ class UpdateManager(private val context: Context, private val http: OkHttpClient
         val release = json.parseToJsonElement(getText("https://api.github.com/repos/$repo/releases/latest", github = true)) as JsonObject
         val assets = (release["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
         fun JsonObject.s(k: String) = (this[k] as? JsonPrimitive)?.contentOrNull.orEmpty()
-        val manifestAsset = assets.firstOrNull { it.s("name") == "update.json" }
-            ?: throw IOException("La última release no contiene update.json")
-        val apkAsset = assets.firstOrNull { it.s("name").endsWith(".apk") }
-            ?: throw IOException("La última release no contiene ningún APK")
+        val manifestName = ReleaseAssets.manifestName(BuildConfig.FLAVOR)
+        val manifestAsset = assets.firstOrNull { it.s("name") == manifestName }
+            ?: throw IOException(
+                if (BuildConfig.FLAVOR == ReleaseAssets.MOBILE) "La última versión publicada no incluye la app del móvil"
+                else "La última release no contiene $manifestName",
+            )
         val manifest = parseManifest(getText(manifestAsset.s("url"), github = true, binary = true), viaGithub = true)
+        // La Release lleva los APK de la TV y del móvil: se baja el que nombra el manifiesto.
+        val apkName = ReleaseAssets.apkName(manifest.apkUrl)
+        val apkAsset = assets.firstOrNull { it.s("name") == apkName }
+            ?: throw IOException("La última release no contiene ${apkName.ifBlank { "el APK" }}")
         return manifest.copy(apkUrl = apkAsset.s("url"), notes = manifest.notes.ifBlank { release.s("body") })
     }
 
@@ -158,4 +167,18 @@ class UpdateManager(private val context: Context, private val http: OkHttpClient
         }
         return b.build()
     }
+}
+
+/**
+ * Ficheros de una Release compartida por la TV y el móvil (ver `.github/workflows/release.yml`):
+ * `lumen-X.Y.Z.apk` + `update.json` para la TV y `lumen-mobile-X.Y.Z.apk` + `update-mobile.json`
+ * para el móvil. `update.json` no cambia de nombre: lo buscan las TV ya instaladas.
+ */
+internal object ReleaseAssets {
+    const val MOBILE = "mobile"
+
+    fun manifestName(flavor: String): String = if (flavor == MOBILE) "update-mobile.json" else "update.json"
+
+    /** Nombre del fichero al final de la `apkUrl` del manifiesto (sin parámetros). */
+    fun apkName(apkUrl: String): String = apkUrl.substringBefore('?').substringBefore('#').substringAfterLast('/')
 }
