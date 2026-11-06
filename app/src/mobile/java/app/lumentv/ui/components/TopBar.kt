@@ -42,6 +42,11 @@ fun TopBar(
     showActions: Boolean = true,
     /** Qué hace la flecha atrás; por defecto, volver a la pantalla anterior. */
     onBack: (() -> Unit)? = null,
+    /**
+     * Título pequeño y píldora VPN sin servidor. Por defecto en vertical; también la piden las
+     * pantallas que la ponen en un panel estrecho (TV en directo con el móvil en horizontal).
+     */
+    compact: Boolean = LocalWidthClass.current == WidthClass.Compact,
 ) {
     Row(
         modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -50,7 +55,6 @@ fun TopBar(
     ) {
         // En vertical el título comparte ~200 dp con la píldora y dos botones: a 30 sp se cortaba
         // («TV en directo», «Test de velocidad»). Ahí baja a `title` y la píldora no lleva el servidor.
-        val compact = LocalWidthClass.current == WidthClass.Compact
         if (showBack) IconCircleButton(Icons.AutoMirrored.Rounded.ArrowBack, "Atrás", onClick = { onBack?.invoke() ?: nav.back() })
         LText(title, style = if (compact) Lumen.type.title else Lumen.type.largeTitle, maxLines = 1, modifier = Modifier.weight(1f))
         if (showActions) {

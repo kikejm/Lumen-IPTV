@@ -3,12 +3,14 @@ package app.lumentv.ui.screens.search
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -69,6 +71,7 @@ private enum class SearchFilter(val label: String) { ALL("Todo"), CHANNELS("Cana
  * Búsqueda maestra (Stitch 12-busqueda) en canales, películas y series de la lista activa, con la
  * misma consulta que la TV (`CatalogRepository.search`). El teclado se abre al entrar.
  */
+@kotlin.OptIn(ExperimentalLayoutApi::class) // consumeWindowInsets
 @Composable
 fun SearchScreen(nav: Navigator, insets: PaddingValues) {
     val graph = LocalGraph.current
@@ -95,7 +98,8 @@ fun SearchScreen(nav: Navigator, insets: PaddingValues) {
     val showMovies = filter == SearchFilter.ALL || filter == SearchFilter.MOVIES
     val showSeries = filter == SearchFilter.ALL || filter == SearchFilter.SERIES
 
-    Column(Modifier.fillMaxSize().padding(insets).imePadding()) {
+    // consumeWindowInsets: imePadding solo añade lo que el teclado sobresale de la barra de navegación.
+    Column(Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets).imePadding()) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             TopBar(nav, "Buscar", showBack = true, showActions = false)
             LumenTextField(
