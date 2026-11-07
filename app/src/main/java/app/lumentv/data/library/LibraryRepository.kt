@@ -34,8 +34,8 @@ class LibraryRepository(private val db: LumenDatabase) {
     }
 
     /**
-     * Canal visto en multipantalla. Va al mismo historial de canales que TV en directo (el reproductor
-     * lo apunta igual), así que «Historial» es el mismo en TV en directo y en el selector de multipantalla.
+     * Canal elegido en la previsualización de TV en directo o en multipantalla. Va al mismo historial de
+     * canales que el reproductor, así que «Historial» es el mismo en TV en directo y en multipantalla.
      */
     suspend fun recordChannel(pid: Long, ch: ChannelEntity) =
         record(HistoryEntity(playlistId = pid, kind = ContentKind.LIVE, itemId = ch.streamId, title = ch.name, image = ch.logo))

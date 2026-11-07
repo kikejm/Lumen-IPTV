@@ -122,6 +122,8 @@ class LiveViewModel(private val graph: AppGraph) : ViewModel() {
 
     fun preview(ch: ChannelEntity) {
         _previewChannel.value = ch
+        // Elegir un canal para la previsualización ya cuenta como verlo: va al historial de canales.
+        playlist.value?.let { p -> graph.appScope.launch { graph.library.recordChannel(p.id, ch) } }
     }
 
     /**

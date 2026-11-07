@@ -104,7 +104,7 @@ Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale 
 - Botón de pantalla completa: fuerza horizontal; el de salir fuerza vertical y libera la orientación cuando el móvil se pone de pie.
 - Foco de audio: el vídeo se pausa con una llamada y no suena encima de otras apps.
 - Reconexión del reproductor igual que en TV: 5 intentos cada 3 s, última imagen congelada y píldora «Error de reproducción, vuelve a conectar en 3 s (1/5)»; agotados, panel con «Reintentar» / «Otro canal» / «Volver».
-- Multipantalla: 2 vídeos en móvil (apilados en vertical, lado a lado en horizontal) y 4 en tableta. Tocar un vídeo le da el audio (anillo blanco); pulsación larga o «⋯» = cambiar canal, ampliar, quitar. Reconexión como en la TV (`StreamReconnect`). El historial de canales es el mismo que el de TV en directo: los canales elegidos aquí entran en «Historial» y el selector de canal lo muestra.
+- Multipantalla: 2 vídeos en móvil (apilados en vertical, lado a lado en horizontal) y 4 en tableta. Tocar un vídeo le da el audio (anillo blanco); pulsación larga o «⋯» = cambiar canal, ampliar, quitar. Reconexión como en la TV (`StreamReconnect`). El historial de canales es el mismo que el de TV en directo (donde cuenta ya el canal elegido para la previsualización): los canales elegidos aquí entran en «Historial» y el selector de canal lo muestra.
 - VPN: los `.conf` se importan con el selector de ficheros, una URL o «Abrir con»/«Compartir» desde otra app; tras importar se muestra el resultado en la pantalla VPN.
 - Salir: en Inicio, Atrás pregunta «¿Estás seguro de que quieres salir?» con «Cancelar | Salir» (`ConfirmDialog`); «Salir» cierra la app.
 
