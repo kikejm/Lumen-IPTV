@@ -1,6 +1,8 @@
 package app.lumentv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,9 +12,15 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.systemBars
@@ -22,6 +30,8 @@ import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -41,6 +51,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -59,11 +71,15 @@ import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.HistoryEntity
 import app.lumentv.di.AppGraph
 import app.lumentv.player.PlayItem
+import app.lumentv.ui.adaptive.LocalTopNav
 import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.adaptive.isCompactHeight
 import app.lumentv.ui.adaptive.currentWidthClass
+import app.lumentv.ui.components.IconCircleButton
 import app.lumentv.ui.components.LText
+import app.lumentv.ui.components.TapSurface
+import app.lumentv.ui.components.VpnPill
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
@@ -91,7 +107,7 @@ import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenTheme
 import kotlinx.coroutines.launch
 
-/** Destinos de la navegación principal (barra inferior en vertical, raíl en horizontal). */
+/** Destinos de la navegación principal (barra inferior en vertical, pestañas arriba en el móvil en horizontal, raíl en la tableta). */
 private data class MainDestination(val route: String, val label: String, val icon: ImageVector)
 
 private val MainDestinations = listOf(
@@ -182,8 +198,7 @@ private fun MobileNavHost(startOnboarding: Boolean) {
         }
     }
 
-    // En Inicio, el gesto atrás sale de la app (comportamiento estándar de Android; en el móvil
-    // no hace falta el «pulsa de nuevo para salir» de la TV). Lo hace el propio NavHost.
+    // En Inicio, Atrás pregunta antes de salir de la app (HomeScreen).
     val host: @Composable (PaddingValues) -> Unit = { insets ->
         NavHost(navController = controller, startDestination = if (startOnboarding) ONBOARDING else Routes.HOME) {
             composable(ONBOARDING) { PlaylistEditScreen(nav, insets, playlistId = null, isOnboarding = true) }
@@ -215,10 +230,14 @@ private fun MobileNavHost(startOnboarding: Boolean) {
     }
 
     // El NavHost está siempre en la misma posición del árbol: al girar el móvil solo aparecen o
-    // desaparecen la barra y el raíl a su alrededor, y las pantallas conservan su estado.
-    val showRail = showNav && widthClass != WidthClass.Compact
+    // desaparecen las barras y el raíl a su alrededor, y las pantallas conservan su estado.
+    // Móvil en horizontal (altura compacta): pestañas arriba en vez del raíl, que se comía 80 dp de
+    // ancho y en ≈ 340 dp de alto no dejaba sitio a su cabecera. Tableta y plegable siguen con raíl.
+    val showTopTabs = showNav && widthClass != WidthClass.Compact && isCompactHeight()
+    val showRail = showNav && widthClass != WidthClass.Compact && !showTopTabs
     val showBottomBar = showNav && widthClass == WidthClass.Compact
-    var sides = WindowInsetsSides.Top + WindowInsetsSides.End
+    var sides: WindowInsetsSides = WindowInsetsSides.End
+    if (!showTopTabs) sides += WindowInsetsSides.Top // la barra de pestañas ya respeta la de estado
     if (!showRail) sides += WindowInsetsSides.Start // el raíl ya respeta el recorte de cámara
     // Con el teclado abierto el mini reproductor se oculta: quedaría tapado y su hueco se sumaría
     // al del teclado en las pantallas con campos de texto.
@@ -233,9 +252,12 @@ private fun MobileNavHost(startOnboarding: Boolean) {
     // de texto. Si estuviera aquí también, el hueco sería el doble y taparía el formulario.
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(sides).asPaddingValues()
     Row(Modifier.fillMaxSize()) {
-        if (showRail) SideRail(route, nav, showHeader = !isCompactHeight())
+        if (showRail) SideRail(route, nav)
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            Box(Modifier.weight(1f)) { host(insets) }
+            if (showTopTabs) TopTabsBar(route, nav)
+            Box(Modifier.weight(1f)) {
+                CompositionLocalProvider(LocalTopNav provides showTopTabs) { host(insets) }
+            }
             if (showMini) {
                 MiniPlayerBar(
                     mini,
@@ -270,17 +292,72 @@ private fun BottomBar(route: String?, nav: Navigator) {
     }
 }
 
+/**
+ * Móvil en horizontal: la navegación principal va arriba, como en la TV (marca · pestañas en control
+ * segmentado · píldora VPN · buscar · ajustes), y sustituye a la barra superior de cada pestaña
+ * (`TopBar` no se pinta con [LocalTopNav]). Así el contenido usa todo el ancho y el alto solo pierde
+ * lo que ya ocupaba esa barra. Si en un móvil estrecho no caben las pestañas, se desplazan.
+ */
 @Composable
-private fun SideRail(route: String?, nav: Navigator, showHeader: Boolean) {
+private fun TopTabsBar(route: String?, nav: Navigator) {
+    val c = Lumen.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            // Barra de estado y recorte de cámara (en horizontal, a un lado); sin el teclado.
+            .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LText("IPTV", style = Lumen.type.title)
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(c.surface)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                MainDestinations.forEach { d ->
+                    val selected = route == d.route
+                    val tint = if (selected) c.accent else c.textSecondary
+                    // 40 dp a la vista; con los 4 dp del contenedor por arriba y por abajo, 48 dp de zona táctil.
+                    TapSurface(
+                        onClick = { if (!selected) nav.replaceRoot(d.route) },
+                        radius = 50.dp,
+                        color = if (selected) c.surfaceElevated else Color.Transparent,
+                        modifier = Modifier.heightIn(min = 40.dp),
+                    ) {
+                        Row(
+                            Modifier.align(Alignment.Center).padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(d.icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+                            Text(d.label, style = Lumen.type.callout, color = tint, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+        VpnPill(onClick = { nav.go(Routes.VPN) }, showServer = false)
+        IconCircleButton(Icons.Rounded.Search, "Buscar", onClick = { nav.go(Routes.SEARCH) })
+        IconCircleButton(Icons.Rounded.Settings, "Ajustes", onClick = { nav.go(Routes.SETTINGS) })
+    }
+}
+
+/** Tableta y plegable: raíl lateral con la marca arriba. */
+@Composable
+private fun SideRail(route: String?, nav: Navigator) {
     val c = Lumen.colors
     NavigationRail(
         // Incluye el recorte de cámara: en horizontal suele quedar a este lado. Sin el teclado.
         windowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Vertical + WindowInsetsSides.Start),
         containerColor = c.surface,
         contentColor = c.textPrimary,
-        // En horizontal en el móvil (≈ 340 dp de alto) la cabecera no deja sitio a las cinco
-        // pestañas: «Guía» se montaba sobre «Series».
-        header = { if (showHeader) LText("IPTV", style = Lumen.type.headline, modifier = Modifier.padding(vertical = 12.dp)) },
+        header = { LText("IPTV", style = Lumen.type.headline, modifier = Modifier.padding(vertical = 12.dp)) },
     ) {
         MainDestinations.forEach { d ->
             NavigationRailItem(

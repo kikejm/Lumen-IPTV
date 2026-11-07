@@ -60,12 +60,13 @@ Alan Sans empaquetada (`res/font`): 800 para títulos, 400 para el resto. Sobre 
 | Ancho | Caso típico | Navegación | Columnas de contenido |
 |---|---|---|---|
 | *Compact* < 600 dp | móvil vertical | barra inferior (64 dp) | 1 |
-| *Medium* 600–840 dp | móvil horizontal, plegable | raíl lateral (72 dp) | 2 paneles |
-| *Expanded* > 840 dp | tableta horizontal | raíl lateral (80 dp) | 2–3 paneles |
+| *Medium* 600–840 dp | móvil horizontal, plegable | raíl lateral (72 dp); en el móvil, pestañas arriba | 2 paneles |
+| *Expanded* > 840 dp | tableta horizontal | raíl lateral (80 dp); en el móvil, pestañas arriba | 2–3 paneles |
 
-Un móvil en horizontal suele pasar de 840 dp de ancho (cae en *Expanded*), pero solo tiene unos 340 dp de alto. Por eso cuenta también la **altura compacta** (< 480 dp, `isCompactHeight`): el raíl va sin la cabecera «IPTV» para que quepan las cinco pestañas, y TV en directo usa su maquetación de móvil horizontal (abajo).
+Un móvil en horizontal suele pasar de 840 dp de ancho (cae en *Expanded*), pero solo tiene unos 340 dp de alto. Por eso cuenta también la **altura compacta** (< 480 dp, `isCompactHeight`): en vez del raíl, la navegación va en una **barra de pestañas arriba**, y TV en directo usa su maquetación de móvil horizontal (abajo).
 
-- Destinos principales (barra o raíl): **Inicio · Directo · Cine · Series · Guía**. Arriba, barra compacta con título, píldora VPN, buscar y ajustes.
+- Destinos principales (barra, pestañas o raíl): **Inicio · Directo · Cine · Series · Guía**. Arriba, barra compacta con título, píldora VPN, buscar y ajustes.
+- **Móvil en horizontal**: una sola barra arriba, como la de la TV: «IPTV» · las cinco pestañas en control segmentado (icono + texto; la activa en acento sobre `surface-elevated`) · píldora VPN · buscar · ajustes. Sustituye al raíl (que se comía 80 dp de ancho y no dejaba sitio a su cabecera) y a la barra superior de cada pestaña (`TopBar` no se pinta bajo ella, `LocalTopNav`), así que el contenido usa todo el ancho y el alto no pierde nada. Si en un móvil estrecho no caben las pestañas, se desplazan. Las pantallas de detalle (con flecha atrás) siguen con su barra.
 - Márgenes laterales 16 dp; *edge-to-edge* respetando *insets* del sistema y el recorte de cámara (en horizontal, a la izquierda o a la derecha).
 - Objetivos táctiles ≥ 48 dp aunque el elemento visible sea menor.
 - Pantallas de detalle (fichas, VPN, Ajustes, catch-up, test de velocidad) ocultan la barra inferior/raíl y muestran flecha atrás; el gesto atrás del sistema siempre vuelve.
@@ -75,7 +76,7 @@ Un móvil en horizontal suele pasar de 840 dp de ancho (cae en *Expanded*), pero
 | Pantalla | Vertical | Horizontal | Tableta |
 |---|---|---|---|
 | Inicio | Sigue viendo → accesos 2×3 → favoritos → emitiendo ahora | Sigue viendo · accesos 3×2 + favoritos | Fila de 3 «sigue viendo», accesos en una fila, rejilla «emitiendo ahora» |
-| TV en directo | Previsualización arriba, chips de categoría y calidad, lista | Barra, chips y lista (≥ 300 dp) · previsualización desde arriba, lo más grande que quepa, + EPG | Categorías · lista · previsualización + EPG |
+| TV en directo | Lista de categorías → (al elegir una) previsualización arriba, chips de calidad y canales | Chips y lista (≥ 300 dp) · previsualización desde arriba, lo más grande que quepa, + EPG | Categorías · lista · previsualización + EPG |
 | Reproductor | Vídeo 16:9 arriba + canal, EPG y canales para zapear | Pantalla completa con gestos | Igual que horizontal |
 | Cine / Series | *Hero* + rejilla 3 columnas | *Hero* compacto + 6 columnas | *Hero* + 8 columnas |
 | Fichas | Arte arriba, datos y episodios debajo | Arte y datos (40 %) · episodios (60 %) | Igual que horizontal |
@@ -85,8 +86,9 @@ Un móvil en horizontal suele pasar de 840 dp de ancho (cae en *Expanded*), pero
 | Opciones (☰ en TV) | Hoja inferior | Hoja lateral derecha (360 dp) | Hoja lateral |
 
 - **Inicio**: si hay una versión nueva, un aviso en acento al 18 % bajo la barra superior (como en la TV); tocarlo descarga e instala el APK, con su barra de progreso. La ✕ lo oculta hasta la próxima vez que se entre en la app; sigue saliendo hasta que se instale.
-- **TV en directo**: al entrar, la previsualización arranca sola con el primer canal salvo que haya algo en el mini reproductor (la cuenta solo admite una conexión) o se esté con datos móviles; entonces muestra «Toca un canal para verlo aquí». Tocar otro canal lo pasa a la previsualización; tocar el que ya suena (o la previsualización) lo abre a pantalla completa sin recargar. Reconecta como la multipantalla (`StreamReconnect`); agotados los intentos, «No disponible · Toca para reintentar».
-- **TV en directo con el móvil en horizontal** (altura compacta): no hay barra superior a todo el ancho. La barra («Directo», píldora VPN, buscar, ajustes) va solo sobre la columna de canales, junto a las píldoras de categoría y calidad; la lista no muestra el número del canal. La previsualización ocupa la derecha desde arriba con el mayor tamaño 16:9 que deje a la vista la línea de lo que se emite y al menos 300 dp a la lista (≈ 430 dp de ancho en un móvil de 6,7″); debajo, la EPG desplazable.
+- **TV en directo**: al entrar no se carga ningún canal (como en la TV): la previsualización muestra «Toca un canal para verlo aquí». Tocar un canal lo pasa a la previsualización; tocar el que ya suena (o la previsualización) lo abre a pantalla completa sin recargar. Al volver a la pantalla (de otra pestaña) el canal que se veía no se recarga solo: «Toca para ver». Reconecta como la multipantalla (`StreamReconnect`); agotados los intentos, «No disponible · Toca para reintentar».
+- **TV en directo en vertical**: al entrar solo se ve la lista de categorías (Todos, Favoritos e Historial arriba; filas de 56 dp con «⋯» para bloquearlas). Al elegir una, la barra superior pasa a flecha atrás + nombre de la categoría, y debajo van la previsualización, los chips de calidad y los canales. La flecha (o el gesto atrás) vuelve a las categorías; desde ellas, Atrás va a Inicio. Si al volver a las categorías está sonando un canal, su previsualización se queda encima de la lista. La vista (categorías o canales) se conserva al ir al reproductor o a otra pestaña.
+- **TV en directo con el móvil en horizontal** (altura compacta): sin barra propia (la navegación, la VPN, buscar y ajustes van en la barra de pestañas de arriba). A la izquierda, píldoras de categoría y calidad y la lista, sin el número del canal. La previsualización ocupa la derecha desde arriba con el mayor tamaño 16:9 que deje a la vista la línea de lo que se emite y al menos 300 dp a la lista; debajo, la EPG desplazable.
 - **Teclado**: las pantallas con campos de texto (alta de lista, búsqueda) se encogen solo lo que ocupa el teclado (`imePadding` tras `consumeWindowInsets`) y desplazan el campo a la vista; los *insets* de la raíz no incluyen el teclado. Mientras está abierto se oculta el mini reproductor.
 - **Pestañas**: cada destino principal guarda su pila y su estado (categoría, desplazamiento) al cambiar de pestaña. Volver de una ficha o del reproductor deja las listas donde estaban.
 - **Barra superior en vertical**: título a 22 sp (`title`) y píldora VPN sin el nombre del servidor, para que el título no se corte.
@@ -104,7 +106,7 @@ Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale 
 - Reconexión del reproductor igual que en TV: 5 intentos cada 3 s, última imagen congelada y píldora «Error de reproducción, vuelve a conectar en 3 s (1/5)»; agotados, panel con «Reintentar» / «Otro canal» / «Volver».
 - Multipantalla: 2 vídeos en móvil (apilados en vertical, lado a lado en horizontal) y 4 en tableta. Tocar un vídeo le da el audio (anillo blanco); pulsación larga o «⋯» = cambiar canal, ampliar, quitar. Reconexión como en la TV (`StreamReconnect`).
 - VPN: los `.conf` se importan con el selector de ficheros, una URL o «Abrir con»/«Compartir» desde otra app; tras importar se muestra el resultado en la pantalla VPN.
-- Salir: en Inicio, el gesto atrás sale de la app directamente (en móvil no hace falta el «pulsa de nuevo para salir» de la TV).
+- Salir: en Inicio, Atrás pregunta «¿Estás seguro de que quieres salir?» con «Cancelar | Salir» (`ConfirmDialog`); «Salir» cierra la app.
 
 ## Elevation & Depth
 
@@ -126,7 +128,7 @@ Viven en `app/src/mobile/java/app/lumentv/ui/components/`. Pueden usar Material 
 - `ProgressLine` — 3 dp, acento.
 - `OptionsSheet` — opciones contextuales: hoja inferior en *Compact*, lateral en *Medium/Expanded*.
 - `PinSheet` — PIN parental con teclado numérico propio (no el del sistema).
-- `ConfirmDialog` y `EmptyState` (icono, título, texto, acción). El error del reproductor es su `ErrorPanel` (icono naranja, mensaje en español, «Reintentar» + acciones alternativas; en vertical, compacto y desplazable).
+- `ConfirmDialog` (el texto es opcional si el título lo dice todo) y `EmptyState` (icono, título, texto, acción). El error del reproductor es su `ErrorPanel` (icono naranja, mensaje en español, «Reintentar» + acciones alternativas; en vertical, compacto y desplazable).
 - `GroupCard` + `SettingRow` / `SwitchRow` (`LumenSwitch`) — listas agrupadas de Ajustes, separadas por `RowDivider`. Valores de una lista corta se eligen en una hoja con opciones de radio, no pasando valores como en la TV.
 - `TextInputSheet` (un campo + «Guardar»), `NoticePill` (aviso de 4 s abajo al centro) y `ReconnectPill` (sobre vídeos pequeños).
 - `MiniPlayer` (`ui/player`), los controles y gestos del reproductor (dentro de `PlayerScreen`) y `VideoSurface` (fuera de cualquier superficie con capa propia, igual que en TV; la pantalla solo se mantiene encendida mientras el vídeo suena o carga).

@@ -265,8 +265,10 @@ fun PlayerScreen(nav: Navigator, embedded: EmbeddedPlayer? = null) {
         }
         player.addListener(listener)
         // El reproductor de la previsualización ya está reproduciendo: sus eventos de estado no se repetirán.
+        // Tampoco el de las pistas: sin leerlas aquí, ☰ a pantalla completa desde TV en directo no ofrecía el audio.
         buffering = player.playbackState != Player.STATE_READY
         isPlaying = player.isPlaying
+        tracks = player.currentTracks
         load(item, reuse = true)
         onDispose {
             item?.let { saveHistory(it) }

@@ -1,5 +1,7 @@
 package app.lumentv.ui.screens.home
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +61,7 @@ import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.components.Artwork
 import app.lumentv.ui.components.Chip
+import app.lumentv.ui.components.ConfirmDialog
 import app.lumentv.ui.components.Gap
 import app.lumentv.ui.components.LText
 import app.lumentv.ui.components.PillButton
@@ -132,6 +136,19 @@ fun HomeScreen(nav: Navigator, insets: PaddingValues) {
     )
     val openTile: (Tile) -> Unit = { t ->
         if (t.route in listOf(Routes.LIVE, Routes.MOVIES, Routes.SERIES, Routes.GUIDE)) nav.replaceRoot(t.route) else nav.go(t.route)
+    }
+
+    // Inicio es la raíz: Atrás no sale a la primera, pregunta antes (como la TV, que pide pulsarlo dos veces).
+    var confirmExit by remember { mutableStateOf(false) }
+    BackHandler { confirmExit = true }
+    if (confirmExit) {
+        ConfirmDialog(
+            title = "¿Estás seguro de que quieres salir?",
+            message = null,
+            confirmLabel = "Salir",
+            onConfirm = { (context as? Activity)?.finish() },
+            onDismiss = { confirmExit = false },
+        )
     }
 
     val last = history.firstOrNull()

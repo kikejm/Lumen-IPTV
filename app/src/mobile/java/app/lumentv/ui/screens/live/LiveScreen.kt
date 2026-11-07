@@ -1,5 +1,6 @@
 package app.lumentv.ui.screens.live
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Fullscreen
@@ -55,7 +57,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.Player
-import app.lumentv.core.net.isMeteredNetwork
 import app.lumentv.core.util.TimeFormatter
 import app.lumentv.data.catalog.QualityFilter
 import app.lumentv.data.db.ChannelEntity
@@ -88,7 +89,6 @@ import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
 import app.lumentv.ui.playChannels
-import app.lumentv.ui.player.LocalMiniPlayer
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import kotlinx.coroutines.delay
@@ -96,11 +96,14 @@ import kotlinx.coroutines.launch
 
 /**
  * TV en directo (Stitch 02-directo / L02-directo / T02-directo). Misma lógica que la TV
- * (`LiveViewModel`, `PlayerFactory.claimStream`): tocar un canal lo pasa a la previsualización y
- * tocar el que ya suena (o el vídeo) lo abre a pantalla completa. Pulsación larga o «⋯» = opciones.
+ * (`LiveViewModel`, `PlayerFactory.claimStream`): al entrar no suena nada; tocar un canal lo pasa a
+ * la previsualización y tocar el que ya suena (o el vídeo) lo abre a pantalla completa. Pulsación
+ * larga o «⋯» = opciones.
  *
- * - Vertical: previsualización arriba, chips de categoría y calidad, lista.
- * - Horizontal: lista (40 %) · previsualización + EPG (60 %).
+ * - Vertical: primero solo la lista de categorías; al elegir una, previsualización arriba, chips de
+ *   calidad y canales, con la flecha atrás (o el gesto atrás) para volver a las categorías.
+ * - Móvil en horizontal: chips y lista · previsualización + EPG.
+ * - Plegable: lista (40 %) · previsualización + EPG (60 %).
  * - Tableta: categorías · lista · previsualización + EPG.
  */
 @Composable
@@ -110,12 +113,18 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     val scope = rememberCoroutineScope()
     val widthClass = LocalWidthClass.current
     val vm: LiveViewModel = viewModel { LiveViewModel(graph) }
-    val mini = LocalMiniPlayer.current
+    // En vertical: ¿se ven los canales de la categoría elegida (true) o la lista de categorías?
+    // Sobrevive al reproductor y al cambio de pestaña, como la categoría y el desplazamiento.
+    val showChannelsState = rememberSaveable { mutableStateOf(false) }
+    var showChannels by showChannelsState
     // Al volver de pantalla completa llega su reproductor con el canal que sonaba (quizá tras hacer
     // zapping): se previsualiza ese canal ya, antes de leer el estado, para no recargarlo. Si la lista
     // a la vista no lo contiene, se abre su categoría.
     val returned = remember {
-        graph.players.takeHandOff()?.also { graph.playback.current?.channel?.let { vm.returnTo(it, playing = true) } }
+        graph.players.takeHandOff()?.also {
+            graph.playback.current?.channel?.let { vm.returnTo(it, playing = true) }
+            showChannelsState.value = true
+        }
     }
     val playlist by vm.playlist.collectAsState()
     val categories by vm.categories.collectAsState()
@@ -139,10 +148,9 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
     val player = remember { returned ?: graph.players.create() }
     var handedOff by remember { mutableStateOf(false) }
     var previewState by remember { mutableIntStateOf(player.playbackState) }
-    // ¿Puede sonar ya? Al entrar se previsualiza sola salvo que haya algo en el mini reproductor (la
-    // cuenta solo admite una conexión y se cortaría) o se esté con datos móviles. Tocar un canal o la
-    // previsualización la activa.
-    var armed by remember { mutableStateOf(returned != null || (mini.player == null && !context.isMeteredNetwork())) }
+    // ¿Puede sonar ya? Al entrar no se carga ningún canal (como en la TV): solo si se vuelve de pantalla
+    // completa con el canal sonando. Tocar un canal (o la previsualización de uno ya elegido) la activa.
+    var armed by remember { mutableStateOf(returned != null) }
     DisposableEffect(Unit) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) { previewState = state }
@@ -176,11 +184,6 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         player.prepare()
         player.playWhenReady = true
     }
-    // Al entrar, previsualiza el primer canal si puede sonar. (En la TV se espera al primer OK; en
-    // el móvil la previsualización está siempre a la vista y se llena sola.)
-    LaunchedEffect(channels.firstOrNull()?.streamId, armed) {
-        if (armed && vm.previewChannel.value == null) channels.firstOrNull()?.let(vm::preview)
-    }
     // La EPG que se muestra es la del canal que suena.
     LaunchedEffect(preview?.streamId) { preview?.let(vm::onChannelFocused) }
 
@@ -202,15 +205,26 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         armed = true
     }
     fun watchPreview() {
-        if (!armed) { armed = true; return }
         val ch = preview ?: return
+        if (!armed) { armed = true; return }
         if (reconnect.failed) { reconnect.retryNow(); return }
         val index = channels.indexOfFirst { it.streamId == ch.streamId }
         if (index >= 0) watch(channels, index) else watch(listOf(ch), 0)
     }
-    fun select(cat: CategoryItem) {
-        if (vm.isCategoryLocked(cat.id)) pinFor = cat else vm.selectedCategory.value = cat.id
+    fun open(id: String) {
+        vm.selectedCategory.value = id
+        showChannels = true
     }
+    fun select(cat: CategoryItem) {
+        if (vm.isCategoryLocked(cat.id)) pinFor = cat else open(cat.id)
+    }
+    val categoryMenuFor: (CategoryItem) -> Unit = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) categoryMenu = it }
+
+    // Móvil en horizontal (altura compacta) y en vertical, cada uno con su maquetación.
+    val landscapePhone = isCompactHeight() && widthClass != WidthClass.Compact
+    val portraitPhone = !landscapePhone && widthClass == WidthClass.Compact
+    // En vertical, Atrás desde los canales vuelve a las categorías (y desde ellas, a Inicio).
+    BackHandler(enabled = portraitPhone && showChannels) { showChannels = false }
 
     val previewBox: @Composable (Modifier) -> Unit = { modifier ->
         PreviewVideo(
@@ -225,7 +239,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         )
     }
     val categoryChips: @Composable () -> Unit = {
-        CategoryChips(categories, selected, onSelect = ::select, onMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) categoryMenu = it })
+        CategoryChips(categories, selected, onSelect = ::select, onMenu = categoryMenuFor)
     }
     val qualityChips: @Composable () -> Unit = {
         if (qualities.size > 1 || quality != QualityFilter.ALL) {
@@ -258,11 +272,11 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         )
     }
 
-    if (isCompactHeight() && widthClass != WidthClass.Compact) {
-        // Móvil en horizontal (≈ 340 dp de alto). Una barra superior a todo el ancho y tres columnas
-        // dejaban la previsualización en un sello. Aquí la barra va solo sobre los canales, las
-        // categorías en píldoras, y la previsualización ocupa la derecha desde arriba, tan grande
-        // como quepa dejando a la vista lo que se emite y al menos LANDSCAPE_LIST_MIN a la lista.
+    if (landscapePhone) {
+        // Móvil en horizontal (≈ 340 dp de alto). La navegación, la VPN, buscar y ajustes van en la
+        // barra de pestañas de arriba (MobileRoot), así que esta pantalla no lleva barra propia: a la
+        // izquierda las categorías en píldoras y los canales; a la derecha la previsualización, tan
+        // grande como quepa dejando a la vista lo que se emite y al menos LANDSCAPE_LIST_MIN a la lista.
         BoxWithConstraints(Modifier.fillMaxSize().padding(insets)) {
             val previewWidth = minOf(
                 (maxHeight - LANDSCAPE_BELOW_PREVIEW) * (16f / 9f),
@@ -270,8 +284,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
                 maxWidth - LANDSCAPE_LIST_MIN - LANDSCAPE_GAP - 16.dp,
             ).coerceAtLeast(0.dp)
             Row(Modifier.fillMaxSize()) {
-                Column(Modifier.weight(1f).fillMaxHeight()) {
-                    Box(Modifier.padding(start = 16.dp)) { TopBar(nav, "Directo", compact = true) }
+                Column(Modifier.weight(1f).fillMaxHeight().padding(top = 4.dp)) {
                     categoryChips()
                     qualityChips()
                     // Sin el número del canal: la columna es estrecha y el nombre necesita el sitio.
@@ -289,17 +302,37 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
             }
         }
     } else Column(Modifier.fillMaxSize().padding(insets)) {
-        Box(Modifier.padding(horizontal = 16.dp)) { TopBar(nav, "TV en directo") }
+        Box(Modifier.padding(horizontal = 16.dp)) {
+            if (portraitPhone && showChannels) {
+                // La flecha de la izquierda (o el gesto atrás) vuelve a las categorías. Sin VPN, buscar ni
+                // ajustes (están en la lista de categorías): el nombre de la categoría necesita el ancho.
+                TopBar(
+                    nav,
+                    categories.firstOrNull { it.id == selected }?.name ?: "TV en directo",
+                    showBack = true,
+                    showActions = false,
+                    onBack = { showChannels = false },
+                )
+            } else {
+                TopBar(nav, "TV en directo")
+            }
+        }
         when (widthClass) {
             WidthClass.Compact -> Column(Modifier.weight(1f)) {
-                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    previewBox(Modifier.fillMaxWidth())
-                    NowLine(preview, programs.firstOrNull(), fmt)
+                // Previsualización arriba: siempre con los canales; sobre las categorías, solo si ya suena algo.
+                if (showChannels || (armed && preview != null)) {
+                    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        previewBox(Modifier.fillMaxWidth())
+                        NowLine(preview, programs.firstOrNull(), fmt)
+                    }
+                    Gap(height = 10.dp)
                 }
-                Gap(height = 10.dp)
-                categoryChips()
-                qualityChips()
-                channelList(Modifier.weight(1f), true)
+                if (showChannels) {
+                    qualityChips()
+                    channelList(Modifier.weight(1f), true)
+                } else {
+                    CategoryList(categories, selected, onSelect = ::select, onMenu = categoryMenuFor, modifier = Modifier.weight(1f))
+                }
             }
             WidthClass.Medium -> Row(Modifier.weight(1f).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.weight(0.4f).fillMaxHeight()) {
@@ -313,7 +346,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
                 }
             }
             WidthClass.Expanded -> Row(Modifier.weight(1f).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                CategoryColumn(categories, selected, onSelect = ::select, onMenu = { if (it.id !in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)) categoryMenu = it }, modifier = Modifier.width(220.dp).fillMaxHeight())
+                CategoryColumn(categories, selected, onSelect = ::select, onMenu = categoryMenuFor, modifier = Modifier.width(220.dp).fillMaxHeight())
                 Column(Modifier.width(360.dp).fillMaxHeight()) {
                     qualityChips()
                     channelList(Modifier.weight(1f), true)
@@ -330,7 +363,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
         PinSheet(
             title = "Categoría bloqueada",
             message = "Introduce el PIN parental para ver «${cat.name}».",
-            onSubmit = { pin -> graph.parental.verify(pin).also { ok -> if (ok) vm.selectedCategory.value = cat.id } },
+            onSubmit = { pin -> graph.parental.verify(pin).also { ok -> if (ok) open(cat.id) } },
             onDismiss = { pinFor = null },
         )
     }
@@ -379,7 +412,7 @@ fun LiveScreen(nav: Navigator, insets: PaddingValues) {
 /** Móvil en horizontal: alto que se deja bajo la previsualización (la línea de lo que se emite). */
 private val LANDSCAPE_BELOW_PREVIEW = 56.dp
 
-/** Móvil en horizontal: ancho mínimo de la columna de canales (cabe la barra con «Directo»). */
+/** Móvil en horizontal: ancho mínimo de la columna de canales. */
 private val LANDSCAPE_LIST_MIN = 300.dp
 
 private val LANDSCAPE_GAP = 12.dp
@@ -399,11 +432,10 @@ private fun PreviewVideo(
     Box(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(LumenDimens.radiusMedium)).background(Color.Black)) {
         if (channel != null && armed) VideoSurface(player, Modifier.fillMaxSize())
         when {
-            !armed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            channel == null || !armed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
                 LText(if (channel == null) "Toca un canal para verlo aquí" else "Toca para ver", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f))
             }
-            channel == null -> Unit
             failed -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 LText("No disponible", style = Lumen.type.headline, color = Color.White)
                 LText("Toca para reintentar", style = Lumen.type.callout, color = Color.White.copy(alpha = 0.7f))
@@ -496,6 +528,50 @@ private fun CategoryChip(cat: CategoryItem, selected: Boolean, onClick: () -> Un
             if (cat.locked) Icon(Icons.Rounded.Lock, contentDescription = "Bloqueada", tint = if (selected) c.onAccent else c.textSecondary, modifier = Modifier.size(14.dp))
             LText(cat.name, style = Lumen.type.callout, color = if (selected) c.onAccent else c.textPrimary, maxLines = 1)
             cat.count?.let { LText("$it", style = Lumen.type.caption, color = if (selected) c.onAccent.copy(alpha = 0.7f) else c.textTertiary) }
+        }
+    }
+}
+
+/**
+ * Móvil en vertical: lo primero que se ve al entrar. Una fila por categoría (Todos, Favoritos e
+ * Historial arriba); tocarla abre sus canales. Pulsación larga o «⋯» = bloquear (control parental).
+ */
+@Composable
+private fun CategoryList(categories: List<CategoryItem>, selected: String, onSelect: (CategoryItem) -> Unit, onMenu: (CategoryItem) -> Unit, modifier: Modifier) {
+    val c = Lumen.colors
+    LazyColumn(modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 8.dp)) {
+        item { LText("CATEGORÍAS", style = Lumen.type.caption, color = c.textSecondary, modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 6.dp)) }
+        items(categories, key = { it.id }) { cat ->
+            val on = cat.id == selected
+            val special = cat.id in listOf(CAT_ALL, CAT_FAVORITES, CAT_RECENT)
+            TapSurface(
+                onClick = { onSelect(cat) },
+                onLongClick = if (special) null else ({ onMenu(cat) }),
+                radius = 12.dp,
+                color = if (on) c.surfaceElevated else Color.Transparent,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().align(Alignment.CenterStart).padding(start = 12.dp, end = if (special) 8.dp else 0.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    LText(
+                        cat.name,
+                        style = Lumen.type.body.copy(fontWeight = Lumen.type.headline.fontWeight),
+                        color = if (on) c.accent else c.textPrimary,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (cat.locked) Icon(Icons.Rounded.Lock, contentDescription = "Bloqueada", tint = c.textSecondary, modifier = Modifier.size(16.dp))
+                    cat.count?.let { LText("$it", style = Lumen.type.callout, color = c.textTertiary) }
+                    if (special) {
+                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = c.textTertiary, modifier = Modifier.size(22.dp))
+                    } else {
+                        IconCircleButton(Icons.Rounded.MoreVert, "Opciones de ${cat.name}", onClick = { onMenu(cat) }, color = Color.Transparent)
+                    }
+                }
+            }
         }
     }
 }

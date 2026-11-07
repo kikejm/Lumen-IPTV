@@ -93,8 +93,10 @@ La app funciona en las dos orientaciones en **todas** las pantallas (no solo el 
 | Clase de ancho | Caso típico | Navegación | Diseño |
 |---|---|---|---|
 | *Compact* (< 600 dp) | móvil en vertical | barra inferior | una columna |
-| *Medium* (600–840 dp) | móvil en horizontal, plegable abierto | raíl lateral | dos paneles |
-| *Expanded* (> 840 dp) | tableta en horizontal | raíl lateral | dos o tres paneles |
+| *Medium* (600–840 dp) | móvil en horizontal, plegable abierto | raíl lateral (móvil en horizontal: pestañas arriba) | dos paneles |
+| *Expanded* (> 840 dp) | tableta en horizontal | raíl lateral (móvil en horizontal: pestañas arriba) | dos o tres paneles |
+
+El móvil en horizontal se distingue por la altura (< 480 dp): ahí el raíl se cambió (7 nov 2026) por una barra de pestañas arriba, como la de la TV, que también lleva la VPN, buscar y ajustes (ver `DESIGN-MOBILE.md`).
 
 Así el mismo código sirve también para tabletas y plegables, y para la multiventana de Android.
 
@@ -103,7 +105,7 @@ Así el mismo código sirve también para tabletas y plegables, y para la multiv
 | Pantalla | Vertical | Horizontal |
 |---|---|---|
 | Inicio | Sigue viendo → accesos 2×3 → favoritos | Sigue viendo a la izquierda; accesos 3×2 y favoritos a la derecha |
-| TV en directo | Previsualización arriba, chips, lista | Lista de canales (40 %) · previsualización + EPG del canal (60 %) |
+| TV en directo | Lista de categorías; al elegir una, previsualización arriba, chips de calidad y canales (flecha atrás a las categorías) | Lista de canales · previsualización + EPG del canal |
 | Reproductor | Vídeo 16:9 arriba con controles básicos y, debajo, EPG/canales; botón para pantalla completa | Pantalla completa con gestos (el modo principal). Girar el móvil entra/sale de pantalla completa |
 | Cine / Series | *Hero* + rejilla de 3 columnas | *Hero* compacto + rejilla de 6 columnas |
 | Ficha de serie | Arte arriba, temporadas y episodios debajo | Arte y datos (40 %) · temporadas y episodios (60 %) |
