@@ -98,7 +98,7 @@ Rejillas de pósters: `GridCells.Adaptive(100.dp)`; el número de columnas sale 
 ### Gestos e interacción
 
 - **Toque** = OK de la TV. **Pulsación larga** = ☰ de la TV, y **siempre** hay también un botón «⋯» visible con las mismas opciones.
-- Reproductor: toque muestra/oculta controles; deslizar vertical a la izquierda = brillo, a la derecha = volumen; doble toque a los lados = ±10 s (VOD); deslizar horizontal en directo = canal anterior/siguiente; candado para bloquear toques.
+- Reproductor: toque muestra/oculta controles; deslizar vertical a la izquierda = brillo, a la derecha = volumen; doble toque a los lados = ±10 s (VOD); deslizar horizontal en directo = canal anterior/siguiente; candado para bloquear toques, que también fija la pantalla en horizontal (ponerse de pie no sale de pantalla completa hasta quitarlo).
 - **Girar el móvil** en el reproductor entra o sale de pantalla completa **sin cortar el vídeo**. El botón de pantalla completa fuerza horizontal y lo libera al salir.
 - Al salir del reproductor con algo sonando: **mini reproductor** de 64 dp sobre la barra inferior (vídeo, canal, pausa, cerrar). Al salir de la app: PiP automático (Android 12+) si está activo en Ajustes; si no hay PiP, todo se pausa y se reanuda al volver. Cerrar la ventana PiP deja el vídeo en pausa. La ventana PiP toma la proporción del vídeo y lleva un botón de pausa/reproducir. Al cerrar el mini reproductor (o si otro vídeo ocupa la conexión) se guarda el minuto de la película o el episodio.
 - Botón de pantalla completa: fuerza horizontal; el de salir fuerza vertical y libera la orientación cuando el móvil se pone de pie.

@@ -423,6 +423,18 @@ fun PlayerScreen(nav: Navigator, insets: PaddingValues) {
         if (listener.canDetectOrientation()) listener.enable() else forcedPortrait = false
         onDispose { listener.disable() }
     }
+    // Candado: además de los toques, la orientación queda fija en horizontal. Sin esto, si se había entrado a
+    // pantalla completa girando el móvil (orientación libre), ponerlo de pie salía de pantalla completa.
+    // Se deja girar 180° (sigue en horizontal). Al quitarlo, vuelve lo que hubiera: horizontal forzado
+    // por el botón de pantalla completa u orientación libre.
+    LaunchedEffect(locked) {
+        val a = context as? Activity ?: return@LaunchedEffect
+        when {
+            locked -> a.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            forcedLandscape -> Unit // ya está en SENSOR_LANDSCAPE
+            !forcedPortrait -> a.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
     fun leave() {
         val current = item
         when {
