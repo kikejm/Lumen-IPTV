@@ -1,6 +1,7 @@
 package app.lumentv.ui.adaptive
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 
@@ -13,10 +14,10 @@ enum class WidthClass {
     /** Móvil en vertical: barra inferior y una columna. */
     Compact,
 
-    /** Móvil en horizontal o plegable: raíl lateral y dos paneles. */
+    /** Móvil en horizontal o plegable: raíl lateral (en el móvil, pestañas arriba) y dos paneles. */
     Medium,
 
-    /** Tableta en horizontal: raíl lateral y dos o tres paneles. */
+    /** Tableta en horizontal: raíl lateral (en el móvil en horizontal, pestañas arriba) y dos o tres paneles. */
     Expanded,
 }
 
@@ -36,7 +37,14 @@ val LocalWidthClass = staticCompositionLocalOf { WidthClass.Compact }
 /**
  * Altura compacta (< 480 dp, el corte de Material): el móvil en horizontal. Ahí no caben una
  * encima de otra la barra superior, la previsualización y la lista, así que TV en directo se
- * maqueta aparte, y el raíl lateral prescinde de su cabecera para que quepan las cinco pestañas.
+ * maqueta aparte, y la navegación principal va en una barra de pestañas arriba ([LocalTopNav]).
  */
 @Composable
 fun isCompactHeight(): Boolean = LocalConfiguration.current.screenHeightDp < 480
+
+/**
+ * La fija `MobileRoot`: true en las pestañas principales con el móvil en horizontal, donde la barra
+ * de pestañas de arriba ya lleva la marca, la VPN, buscar y ajustes. Ahí `TopBar` no se pinta (salvo
+ * con flecha atrás), para no repetir la barra y no gastar alto, que es lo que falta en horizontal.
+ */
+val LocalTopNav = compositionLocalOf { false }

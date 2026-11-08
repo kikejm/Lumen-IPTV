@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import app.lumentv.ui.navigation.LocalGraph
 import app.lumentv.ui.navigation.Navigator
 import app.lumentv.ui.navigation.Routes
+import app.lumentv.ui.adaptive.LocalTopNav
 import app.lumentv.ui.adaptive.LocalWidthClass
 import app.lumentv.ui.adaptive.WidthClass
 import app.lumentv.ui.theme.Lumen
@@ -30,8 +31,8 @@ import app.lumentv.vpn.VpnState
 
 /**
  * Barra superior del móvil: título (o flecha atrás en pantallas de detalle), píldora VPN,
- * buscar y ajustes. Igual en vertical y en horizontal; en horizontal la navegación principal
- * está en el raíl lateral.
+ * buscar y ajustes. En las pestañas principales con el móvil en horizontal no se pinta: ahí la
+ * barra de pestañas de arriba (`MobileRoot`) ya lleva la VPN, buscar y ajustes.
  */
 @Composable
 fun TopBar(
@@ -42,12 +43,10 @@ fun TopBar(
     showActions: Boolean = true,
     /** Qué hace la flecha atrás; por defecto, volver a la pantalla anterior. */
     onBack: (() -> Unit)? = null,
-    /**
-     * Título pequeño y píldora VPN sin servidor. Por defecto en vertical; también la piden las
-     * pantallas que la ponen en un panel estrecho (TV en directo con el móvil en horizontal).
-     */
+    /** Título pequeño y píldora VPN sin servidor. Por defecto en vertical, donde el ancho es escaso. */
     compact: Boolean = LocalWidthClass.current == WidthClass.Compact,
 ) {
+    if (LocalTopNav.current && !showBack) return
     Row(
         modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

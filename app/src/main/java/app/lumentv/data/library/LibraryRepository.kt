@@ -1,5 +1,6 @@
 package app.lumentv.data.library
 
+import app.lumentv.data.db.ChannelEntity
 import app.lumentv.data.db.ContentKind
 import app.lumentv.data.db.FavoriteEntity
 import app.lumentv.data.db.HistoryEntity
@@ -31,6 +32,13 @@ class LibraryRepository(private val db: LumenDatabase) {
         dao.upsertHistory(entry.copy(watchedAt = System.currentTimeMillis()))
         if (entry.kind == ContentKind.LIVE) dao.trimHistory(entry.playlistId, ContentKind.LIVE, MAX_LIVE_HISTORY)
     }
+
+    /**
+     * Canal elegido en la previsualización de TV en directo o en multipantalla. Va al mismo historial de
+     * canales que el reproductor, así que «Historial» es el mismo en TV en directo y en multipantalla.
+     */
+    suspend fun recordChannel(pid: Long, ch: ChannelEntity) =
+        record(HistoryEntity(playlistId = pid, kind = ContentKind.LIVE, itemId = ch.streamId, title = ch.name, image = ch.logo))
 
     suspend fun clearHistory(pid: Long) = dao.clearHistory(pid)
 

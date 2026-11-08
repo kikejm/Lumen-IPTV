@@ -79,6 +79,7 @@ import app.lumentv.ui.screens.live.LiveViewModel
 import app.lumentv.ui.theme.Lumen
 import app.lumentv.ui.theme.LumenDimens
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val SLOT_GAP = 6.dp
 private val HINTS_HEIGHT = 30.dp
@@ -330,6 +331,8 @@ private fun MultiViewGrid(layout: MultiLayout) {
                 playWhenReady = true
                 volume = if (slotIndex == focusedSlot) 1f else 0f
             }
+            // Historial de canales compartido con TV en directo.
+            graph.appScope.launch { graph.library.recordChannel(p.id, ch) }
             pickerFor = null
         }
     }

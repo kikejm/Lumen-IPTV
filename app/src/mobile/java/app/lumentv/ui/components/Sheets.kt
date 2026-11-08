@@ -209,7 +209,8 @@ fun PinSheet(
 @Composable
 fun ConfirmDialog(
     title: String,
-    message: String,
+    /** Sin texto (`null`) cuando el título ya lo dice todo, como «¿Estás seguro de que quieres salir?». */
+    message: String?,
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -222,7 +223,7 @@ fun ConfirmDialog(
         titleContentColor = c.textPrimary,
         textContentColor = c.textSecondary,
         title = { LText(title, style = Lumen.type.headline) },
-        text = { LText(message, style = Lumen.type.body) },
+        text = if (message != null) { { LText(message, style = Lumen.type.body) } } else null,
         confirmButton = {
             TapSurface(
                 onClick = { onDismiss(); onConfirm() },

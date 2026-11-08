@@ -148,7 +148,7 @@ Lumen es una app de TV que se usa **a 3 metros y solo con el mando del Fire TV**
 - Pista de teclas (`KeyHints`) al pie cuando hay gestos no obvios (☰).
 - **Multipantalla**: la pantalla elegida solo lleva anillo (sin halo, para no teñir las franjas). OK la amplía (o elige canal si está vacía), ☰ cambia el canal y Atrás vuelve a la disposición.
 - **Zoom de vídeo** (TV en directo y multipantalla): 300 ms, reversible a medias, siempre con el mismo `SurfaceView` (`placedAt`, `VideoZoomSpec`). En TV en directo, Atrás reduce a la primera y lleva al canal que sonaba, en su categoría si la lista a la vista no lo contiene.
-- **Historial de canales**: los 10 últimos; ☰ «Quitar del historial».
+- **Historial de canales**: los 10 últimos; ☰ «Quitar del historial». Es el mismo en TV en directo y en multipantalla: cuentan los canales elegidos para la previsualización, los vistos a pantalla completa y los elegidos para una pantalla de multipantalla, y el selector de canal de multipantalla tiene su categoría «Historial».
 - **Reconexión en vídeos pequeños** (previsualización y multipantalla, `StreamReconnect`): con los mismos límites que el reproductor (5 intentos, uno cada 3 s; también tras 20 s cargando), con la última imagen y una píldora «Reconectando (1/5)». Agotados, «No disponible»: en multipantalla OK reintenta; en la previsualización, OK abre el reproductor.
 - **Tecla Inicio**: cierra la app. No hay Picture-in-Picture.
 - **Salir de la app**: en la pantalla raíz (Inicio, u onboarding si no hay lista), Atrás no cierra a la primera: muestra una píldora «PULSA DE NUEVO PARA SALIR» abajo al centro durante 1,5 s y solo sale si se pulsa Atrás otra vez en ese tiempo. En el resto de pantallas Atrás vuelve atrás como siempre.
